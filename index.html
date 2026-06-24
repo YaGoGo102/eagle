@@ -1,19 +1,15 @@
 <!DOCTYPE html>
 <html>
-<body style="background:#000; color:#fff;">
-    <h1 id="status">接続中...</h1>
-    <div id="hud" style="font-size:30px;">HP: --</div>
-
+<body>
+    <h1>マイクラボット操作中...</h1>
+    <div id="status">HPデータ待機中</div>
     <script>
-        // ★ここを自分のPCのIPに書き換えること！
-        const ws = new WebSocket('ws://118.104.167.114:8080'); 
-
-        ws.onopen = () => { document.getElementById('status').innerText = "接続成功！"; };
+        // WebSocketでサーバーと通信
+        const ws = new WebSocket('ws://' + window.location.host);
         ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
-            document.getElementById('hud').innerText = `HP: ${Math.floor(data.health)}`;
+            document.getElementById('status').innerText = "HP: " + data.health;
         };
-        ws.onerror = (err) => { document.getElementById('status').innerText = "接続エラー！PCのファイアウォールを確認して"; };
     </script>
 </body>
 </html>
