@@ -26,8 +26,8 @@
 
     <script>
         let ws, scene, camera, renderer;
-        const keys = { w:false, a:false, s:false, d:false, space:false };
-        const keyMap = {'w':'w', 'a':'a', 's':'s', 'd':'d', ' ':'space'};
+        const keys = { w:false, a:false, s:false, d:false, space:false, shift:false, ctrl:false };
+        const keyMap = {'w':'w', 'a':'a', 's':'s', 'd':'d', ' ':'space', 'shift':'shift', 'control':'ctrl'};
         const raycaster = new THREE.Raycaster();
 
         function start() {
@@ -65,19 +65,13 @@
 
             const canvas = document.getElementById('game-canvas');
             canvas.onclick = () => canvas.requestPointerLock();
-            
             document.addEventListener('mousedown', (e) => {
                 if(document.pointerLockElement) {
                     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
                     const intersects = raycaster.intersectObjects(scene.children);
-                    ws.send(JSON.stringify({
-                        type:'click', 
-                        button:e.button, 
-                        target: intersects.length > 0 ? intersects[0].point : null
-                    }));
+                    ws.send(JSON.stringify({type:'click', button:e.button, target: intersects[0]?.point || null}));
                 }
             });
-            
             document.addEventListener('mousemove', (e) => {
                 if(document.pointerLockElement) ws.send(JSON.stringify({type:'look', dx:-e.movementX*0.002, dy:-e.movementY*0.002}));
             });
