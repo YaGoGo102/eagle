@@ -1,27 +1,37 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Goku Bot - Real Minecraft View</title>
+    <title>Minecraft Web Client</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>body { margin: 0; background: #000; overflow: hidden; }</style>
 </head>
 <body>
     <script>
-        // 1. 3Dシーンの準備
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer();
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // 2. WebSocket接続
         const ws = new WebSocket('ws://' + window.location.hostname + ':8080');
-        
-        // 3. データを受け取って視点を動かす
+
+        // データの受け取りとカメラ同期
         ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
-            camera.position.set(data.x, data.y + 1.6, 0); // 高さ1.6mが目の高さ
-            renderer.render(scene, camera);
+            if(data.type === 'update') {
+                camera.position.set(data.pos.x, data.pos.y + 1.6, data.pos.z);
+                camera.rotation.set(data.pitch, data.yaw, 0, 'YXZ');
+                renderer.render(scene, camera);
+            }
+        };
+
+        // 操作の転送（W, A, S, Dキー）
+        const keys = { 'w':'forward', 'a':'left', 's':'back', 'd':'right' };
+        document.onkeydown = (e) => {
+            if(keys[e.key]) ws.send(JSON.stringify({type:'key', key:keys[e.key], value:true}));
+        };
+        document.onkeyup = (e) => {
+            if(keys[e.key]) ws.send(JSON.stringify({type:'key', key:keys[e.key], value:false}));
         };
     </script>
 </body>
