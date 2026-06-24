@@ -1,14 +1,19 @@
 <!DOCTYPE html>
 <html>
-<body>
-    <h1>マイクラボット操作画面</h1>
-    <div id="hud">HP: --</div>
+<body style="background:#000; color:#fff;">
+    <h1 id="status">接続中...</h1>
+    <div id="hud" style="font-size:30px;">HP: --</div>
+
     <script>
-        const ws = new WebSocket('ws://' + window.location.host);
+        // ★ここを自分のPCのIPに書き換えること！
+        const ws = new WebSocket('ws://192.168.0.x:8080'); 
+
+        ws.onopen = () => { document.getElementById('status').innerText = "接続成功！"; };
         ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
             document.getElementById('hud').innerText = `HP: ${Math.floor(data.health)}`;
         };
+        ws.onerror = (err) => { document.getElementById('status').innerText = "接続エラー！PCのファイアウォールを確認して"; };
     </script>
 </body>
 </html>
