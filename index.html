@@ -2,122 +2,81 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Minecraft Real Web Play v3</title>
+    <title>Minecraft Bot Controller</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #111; font-family: monospace; color: #fff; }
-        #login-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #222; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
-        .box { background: #333; padding: 30px; border-radius: 10px; text-align: center; }
-        input { width: 280px; padding: 12px; margin-bottom: 15px; background: #111; border: 1px solid #555; color: #fff; text-align: center; font-size: 16px; }
-        button { padding: 12px 30px; background: #55ff55; color: #000; font-weight: bold; border: none; cursor: pointer; font-size: 16px; }
-        
-        #screen-container { width: 100%; height: 100%; display: none; position: relative; }
-        iframe { width: 100%; height: 100%; border: none; pointer-events: none; } /* マウス入力を横取りするため非アクティブに */
-        
-        /* マウスドラッグを検知するための透明なカバー層 */
-        #input-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; cursor: move; }
-        #guide-bar { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); padding: 8px 15px; border-radius: 5px; font-size: 12px; color: #ffaa00; font-weight: bold; pointer-events: none; z-index: 20; text-align: center; }
+        body { background: #222; color: #fff; font-family: sans-serif; text-align: center; padding: 50px; }
+        .box { max-width: 400px; margin: 0 auto; background: #333; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        h1 { font-size: 20px; color: #ffaa00; margin-bottom: 20px; }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; background: #222; border: 1px solid #555; color: #fff; text-align: center; font-size: 16px; border-radius: 4px; }
+        button { width: 100%; padding: 12px; background: #55ff55; color: #000; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        #status-panel { display: none; margin-top: 20px; background: #444; padding: 15px; border-radius: 4px; color: #ffaa00; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <div id="login-screen">
-        <div class="box">
-            <h2 style="color:#ffaa00; margin-bottom:20px;">🎮 遠隔マイクラ・マルチプレイ操作パネル</h2>
-            <input type="text" id="server-ip" placeholder="自宅PCのIPアドレス" value="localhost"><br>
-            <input type="text" id="username" placeholder="ボット名" value="Goku_Bot"><br>
-            <button onclick="startStreamGame()">ワールドに入る</button>
+    <div class="box">
+        <h1>🤖 ボット遠隔操作パネル</h1>
+        
+        <div id="login-form">
+            <input type="text" id="username" value="Goku_Bot_1" maxlength="16">
+            <button onclick="connectBot()">この名前で参加させる</button>
         </div>
-    </div>
 
-    <div id="screen-container">
-        <div id="input-overlay"></div>
-        <iframe id="live-screen" src=""></iframe>
-        <div id="guide-bar">【操作】WASD：移動 / Space：ジャンプ / 画面をドラッグ：視点変更（見回す）</div>
+        <div id="status-panel">
+            接続完了！ 👤 <span id="bot-name" style="color:#fff;"></span><br><br>
+            <span style="color:#fff; font-size:14px;">
+                このタブを選択した状態で、キーボードの<br>
+                <strong>W, A, S, D / Space</strong> を押すとボットが動きます！
+            </span>
+            <br><br>
+            <span style="color:#aaa; font-size:11px; font-weight:normal;">（このタブを閉じるとマイクラから自動退出します）</span>
+        </div>
     </div>
 
     <script>
         let ws = null;
         const keys = { forward: false, back: false, left: false, right: false, jump: false };
-        
-        // 視点（角度）の管理変数
-        let yaw = 0;
-        let pitch = 0;
-        let isDragging = false;
 
-        function startStreamGame() {
-            const ip = document.getElementById('server-ip').value.trim();
+        function connectBot() {
             const user = document.getElementById('username').value.trim();
-            if (!ip || !user) return alert("入力してください");
+            if (!user) return alert("名前を入力してください");
 
-            const myViewPort = Math.floor(Math.random() * 100) + 3000;
-            ws = new WebSocket(`ws://${ip}:8080`);
+            // 自宅PCのサーバー（localhost）に接続
+            ws = new WebSocket('ws://localhost:8080');
 
             ws.onopen = () => {
-                ws.send(JSON.stringify({ type: 'login', username: user, viewPort: myViewPort }));
+                ws.send(JSON.stringify({ type: 'login', username: user }));
             };
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 if (data.type === 'login_success') {
-                    document.getElementById('login-screen').style.display = 'none';
-                    document.getElementById('screen-container').style.display = 'block';
-                    document.getElementById('live-screen').src = `http://${ip}:${data.viewPort}`;
-                    
-                    setupControls();
+                    document.getElementById('login-form').style.display = 'none';
+                    document.getElementById('status-panel').style.display = 'block';
+                    document.getElementById('bot-name').innerText = user;
                 }
             };
 
-            ws.onerror = () => alert("接続失敗。");
+            ws.onerror = () => alert("中継サーバー(server.js)が起動していません。");
         }
 
-        function setupControls() {
-            const sendMove = () => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'move', ...keys })); };
-            
-            // キーボード操作
-            window.addEventListener('keydown', (e) => {
-                const k = e.key.toLowerCase();
-                if (['w','a','s','d',' '].includes(k)) {
-                    if (k === 'w') keys.forward = true; if (k === 's') keys.back = true;
-                    if (k === 'a') keys.left = true; if (k === 'd') keys.right = true;
-                    if (k === ' ') keys.jump = true; sendMove();
-                }
-            });
-            window.addEventListener('keyup', (e) => {
-                const k = e.key.toLowerCase();
-                if (['w','a','s','d',' '].includes(k)) {
-                    if (k === 'w') keys.forward = false; if (k === 's') keys.back = false;
-                    if (k === 'a') keys.left = false; if (k === 'd') keys.right = false;
-                    if (k === ' ') keys.jump = false; sendMove();
-                }
-            });
-
-            // マウスドラッグによる視点（首振り）操作
-            const overlay = document.getElementById('input-overlay');
-            
-            overlay.addEventListener('mousedown', () => { isDragging = true; });
-            window.addEventListener('mouseup', () => { isDragging = false; });
-            
-            overlay.addEventListener('mousemove', (e) => {
-                if (!isDragging) return;
-
-                // マウスの移動量に応じてボットの視点角度を計算 (感度調整)
-                yaw -= e.movementX * 0.005;
-                pitch -= e.movementY * 0.005;
-
-                // 真上・真下を向きすぎないように制限 (マイクラの仕様制限)
-                pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
-
-                // サーバーへ視点データを送信
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        type: 'look',
-                        yaw: yaw,
-                        pitch: pitch
-                    }));
-                }
-            });
-        }
+        const sendMove = () => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'move', ...keys })); };
+        window.addEventListener('keydown', (e) => {
+            const k = e.key.toLowerCase();
+            if (['w','a','s','d',' '].includes(k)) {
+                if (k === 'w') keys.forward = true; if (k === 's') keys.back = true;
+                if (k === 'a') keys.left = true; if (k === 'd') keys.right = true;
+                if (k === ' ') keys.jump = true; sendMove();
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if (['w','a','s','d',' '].includes(k)) {
+                if (k === 'w') keys.forward = false; if (k === 's') keys.back = false;
+                if (k === 'a') keys.left = false; if (k === 'd') keys.right = false;
+                if (k === ' ') keys.jump = false; sendMove();
+            }
+        });
     </script>
 </body>
 </html>
