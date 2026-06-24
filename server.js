@@ -1,5 +1,6 @@
 const mineflayer = require('mineflayer');
 const { WebSocketServer } = require('ws');
+const mineflayerViewer = require('prismarine-viewer').mineflayer; // 3D映像配信ライブラリ
 
 // 1. マイクラサーバーに接続するボットの設定
 const bot = mineflayer.createBot({
@@ -15,7 +16,7 @@ const wss = new WebSocketServer({ port: 8080 });
 const clients = new Set();
 
 wss.on('connection', (ws) => {
-    console.log(`🌐 新しいプレイヤーがWebパネルに接続しました！ (現在: ${clients.size + 1}人)`);
+    console.log(`🌐 新しいプレイヤーが接続しました！ (現在: ${clients.size + 1}人)`);
     clients.add(ws);
 
     ws.on('close', () => {
@@ -39,10 +40,14 @@ wss.on('connection', (ws) => {
     });
 });
 
-// 3. ボットがマイクラ世界にログインしたときの処理
+// 3. ボットがログインしたら3Dマップ配信（ポート3000）を開始
 bot.on('spawn', () => {
-    console.log('🤖 Goku_Bot がマイクラサーバーに正常にログインしました！');
+    console.log('🤖 Goku_Bot ログイン成功！ 3D画面の配信を開始します...');
     
+    // Webブラウザに向けてボット視点の3D映像をポート3000番で配信
+    mineflayerViewer(bot, { port: 3000, firstPerson: true });
+
+    // ステータス（HPやインベントリ）の超高速同期
     setInterval(() => {
         if (clients.size === 0) return;
 
