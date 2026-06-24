@@ -1,35 +1,34 @@
-const mineflayer = require('mineflayer');
-const { WebSocketServer } = require('ws');
-
-const wss = new WebSocketServer({ port: 8080 });
-
-wss.on('connection', (ws) => {
-    let myBot = null;
-    ws.on('message', (message) => {
-        try {
-            const data = JSON.parse(message);
-            if (data.type === 'login' && !myBot) {
-                myBot = mineflayer.createBot({
-                    host: 'localhost',
-                    port: 25565,
-                    username: data.username,
-                    version: '1.20.1',
-                    skipValidation: true
-                });
-                myBot.on('spawn', () => ws.send(JSON.stringify({ type: 'login_success' })));
-                myBot.on('error', (err) => console.log(err));
-            }
-            if (data.type === 'move' && myBot) {
-                myBot.setControlState('forward', data.forward);
-                myBot.setControlState('back', data.back);
-                myBot.setControlState('left', data.left);
-                myBot.setControlState('right', data.right);
-                myBot.setControlState('jump', data.jump);
-            }
-            if (data.type === 'look' && myBot) {
-                myBot.look(data.yaw, data.pitch, true);
-            }
-        } catch (e) {}
-    });
-});
-console.log('🚀 安定版サーバー起動中...');
+<!DOCTYPE html>
+<html>
+<head><title>WebCraft</title></head>
+<body style="margin:0; overflow:hidden; background:#000;">
+    <div id="login" style="position:absolute; top:20%; left:40%;">
+        <input id="ip" value="localhost">
+        <input id="user" value="Goku_Bot">
+        <button onclick="start()">接続</button>
+    </div>
+    <div id="canvas" style="display:none; width:100vw; height:100vh;"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let ws;
+        function start() {
+            const ip = document.getElementById('ip').value;
+            const user = document.getElementById('user').value;
+            document.getElementById('login').style.display = 'none';
+            document.getElementById('canvas').style.display = 'block';
+            
+            // 3Dレンダリングの初期化処理（以前入れたものをここに記述）
+            // ... (先ほどのinit3Dのコードを入れてください)
+            
+            ws = new WebSocket(`ws://${ip}:8080`);
+            ws.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                if(data.type === 'sync_3d') {
+                    // 3D同期処理
+                }
+            };
+            ws.onopen = () => ws.send(JSON.stringify({type:'login', username:user}));
+        }
+    </script>
+</body>
+</html>
