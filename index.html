@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>WebCraft Improved</title>
+    <title>WebCraft Fully Integrated</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
@@ -19,9 +19,9 @@
     <div id="login-screen">
         <div class="box">
             <h2 style="margin-bottom:20px;">🎮 WebCraft 3D Client</h2>
-            <input type="text" id="server-ip" value="localhost"><br>
-            <input type="text" id="username" value="Goku_Bot"><br>
-            <button onclick="startStreamGame()">参加する</button>
+            <input type="text" id="server-ip" value="localhost" placeholder="自宅PCのIPアドレス"><br>
+            <input type="text" id="username" value="Goku_Bot" placeholder="ボット名"><br>
+            <button onclick="startStreamGame()">ワールドに入る</button>
         </div>
     </div>
 
@@ -32,11 +32,10 @@
         const keys = { forward: false, back: false, left: false, right: false, jump: false };
         let scene, camera, renderer, entityMeshes = {};
         
-        // テクスチャ読み込みの設定を一箇所にまとめました
+        // テクスチャ読み込みの設定
         const loader = new THREE.TextureLoader();
         const textureBaseUrl = "https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20.1/assets/minecraft/textures/block/";
         
-        // 代表的なテクスチャ（これを使ってModブロックも表現できます）
         const textures = {
             stone: loader.load(textureBaseUrl + 'stone.png'),
             dirt: loader.load(textureBaseUrl + 'dirt.png')
@@ -45,6 +44,7 @@
         function startStreamGame() {
             const ip = document.getElementById('server-ip').value.trim();
             const user = document.getElementById('username').value.trim();
+            if (!ip || !user) return alert("入力してください");
             
             init3D();
 
@@ -68,7 +68,6 @@
 
                     data.entities.forEach(e => {
                         if (!entityMeshes[e.id]) {
-                            // ここで読み込んだテクスチャを適用！
                             const mat = new THREE.MeshBasicMaterial({ map: textures.stone });
                             const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.8, 0.6), mat);
                             scene.add(mesh);
@@ -92,7 +91,30 @@
         }
 
         function setupControls() {
-            // ... (setupControlsの中身は前のままでOK)
+            window.addEventListener('keydown', (e) => {
+                if(e.key === 'w') keys.forward = true;
+                if(e.key === 's') keys.back = true;
+                if(e.key === 'a') keys.left = true;
+                if(e.key === 'd') keys.right = true;
+                if(e.key === ' ') keys.jump = true;
+                ws.send(JSON.stringify({ type: 'move', ...keys }));
+            });
+            window.addEventListener('keyup', (e) => {
+                if(e.key === 'w') keys.forward = false;
+                if(e.key === 's') keys.back = false;
+                if(e.key === 'a') keys.left = false;
+                if(e.key === 'd') keys.right = false;
+                if(e.key === ' ') keys.jump = false;
+                ws.send(JSON.stringify({ type: 'move', ...keys }));
+            });
+            window.addEventListener('mousemove', (e) => {
+                if(document.pointerLockElement) {
+                    let yaw = 0, pitch = 0;
+                    yaw -= e.movementX * 0.002;
+                    pitch -= e.movementY * 0.002;
+                    ws.send(JSON.stringify({ type: 'look', yaw: yaw, pitch: pitch }));
+                }
+            });
         }
     </script>
 </body>
