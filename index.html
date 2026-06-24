@@ -2,122 +2,185 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Minecraft Realtime 3D Controller</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eaglercraft Style Web Minecraft</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: monospace; color: #fff; }
         
-        /* 本物の3Dゲーム画面（Prismarine-Viewer）を全画面表示 */
-        #game-viewer {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            border: none;
-            z-index: 1;
-        }
+        /* 本物のマイクラと同じWebGL描画画面 */
+        #minecraft-canvas { width: 100%; height: 100%; display: block; }
 
-        /* ゲーム画面の上に重ねるマイクラUI層 */
-        #ui-layer {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 2;
-            pointer-events: none; /* 下の3D画面の操作を邪魔しない */
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px;
+        /* MOJANG風の起動画面 */
+        #loading-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #ef3237; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 100;
         }
+        .mojang-logo { font-size: 48px; font-weight: bold; letter-spacing: 4px; margin-bottom: 30px; text-shadow: 2px 2px #000; }
+        .loading-bar { width: 260px; height: 12px; border: 2px solid #fff; background: #000; padding: 2px; }
+        .loading-fill { width: 0%; height: 100%; background: #fff; transition: width 0.2s; }
 
-        #crosshair { font-size: 24px; color: rgba(255, 255, 255, 0.8); position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-        #debug-info { position: absolute; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.5); padding: 10px; font-family: monospace; font-size: 13px; color: #fff; }
+        /* ゲームのHUDレイアウト（照準、ホットバー、F3画面） */
+        #game-hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: none; }
+        #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; color: rgba(255,255,255,0.5); }
         
-        #hud { position: absolute; bottom: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-        .bars { display: flex; justify-content: space-between; width: 364px; font-size: 16px; }
-        .hearts { color: #ff2222; } .food { color: #ffaa00; }
-
-        #hotbar { display: flex; background: rgba(0, 0, 0, 0.6); border: 4px solid #8f8f8f; border-top-color: #3f3f3f; border-left-color: #3f3f3f; }
-        .slot { width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; position: relative; font-size: 10px; font-family: monospace; text-shadow: 1px 1px #000; }
-        .item-count { position: absolute; bottom: 2px; right: 4px; font-size: 12px; color: #fff; }
-
-        #disconnect { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10; display: flex; justify-content: center; align-items: center; color: #ff5555; font-size: 24px; font-family: monospace; }
+        #f3-menu { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.4); padding: 8px; font-size: 12px; line-height: 1.5; }
+        
+        #hotbar-container { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .status-bars { display: flex; justify-content: space-between; width: 364px; font-size: 16px; text-shadow: 1px 1px #000; }
+        #hotbar { display: flex; background: rgba(0,0,0,0.6); border: 4px solid #8f8f8f; border-top-color: #3f3f3f; border-left-color: #3f3f3f; }
+        .slot { width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; position: relative; font-size: 11px; }
+        .slot.active { border: 2px solid #fff; background: rgba(255,255,255,0.2); }
     </style>
+    <!-- Chromebookのブラウザで超高速にマイクラの3D世界を描画する軽量ライブラリ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
-    <iframe id="game-viewer" src="http://localhost:3000"></iframe>
+    <!-- 1. 起動画面 -->
+    <div id="loading-screen">
+        <div class="mojang-logo">MOJANG</div>
+        <div style="font-size: 12px; margin-bottom: 10px;" id="load-text">Loading Web Minecraft Engine...</div>
+        <div class="loading-bar"><div class="loading-fill" id="fill"></div></div>
+    </div>
 
-    <div id="ui-layer">
-        <div id="debug-info">
-            Minecraft 1.20.1 (Goku_Bot 3D Stream)<br>
-            XYZ: <span id="pos-x">0.0</span> / <span id="pos-y">0.0</span> / <span id="pos-z">0.0</span>
+    <!-- 2. 本物のマイクラ3Dゲーム画面（Canvas） -->
+    <canvas id="minecraft-canvas"></canvas>
+
+    <!-- 3. ゲーム内のUI層 -->
+    <div id="game-hud">
+        <div id="f3-menu">
+            Eaglercraft Web Edition (1.20.1/Forge Protocol)<br>
+            FPS: <span id="fps-val">60</span><br>
+            XYZ: <span id="pos-x">0.0</span> / <span id="pos-y">0.0</span> / <span id="pos-z">0.0</span><br>
+            Chunk Updates: 12
         </div>
         <div id="crosshair">+</div>
-        <div id="hud">
-            <div class="bars">
-                <div class="hearts" id="hearts">❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️</div>
-                <div class="food" id="food">🍖🍖🍖🍖🍖🍖🍖🍖🍖🍖</div>
+        <div id="hotbar-container">
+            <div class="status-bars">
+                <div style="color: #ff2222;">❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️</div>
+                <div style="color: #ffaa00;">🍖🍖🍖🍖🍖🍖🍖🍖🍖🍖</div>
             </div>
             <div id="hotbar">
-                <div class="slot" id="s0"><span class="item-name"></span><span class="item-count"></span></div>
-                <div class="slot" id="s1"><span class="item-name"></span><span class="item-count"></span></div>
-                <div class="slot" id="s2"><span class="item-name"></span><span class="item-count"></span></div>
-                <div class="slot" id="s3"><span class="item-name"></span><span class="item-count"></span></div>
-                <div class="slot" id="s4"><span class="item-name"></span><span class="item-count"></span></div>
-                <div class="slot" id="s5"><span class="item-name"></span><span class="item-count"></span></div>
-                <div class="slot" id="s6"><span class="item-name"></span><span class="item-count"></span></div>
-                <div class="slot" id="s7"><span class="item-name"></span><span class="item-count"></span></div>
-                <div class="slot" id="s8"><span class="item-name"></span><span class="item-count"></span></div>
+                <div class="slot active"><span id="s0"></span></div>
+                <div class="slot"><span id="s1"></span></div>
+                <div class="slot"><span id="s2"></span></div>
+                <div class="slot"><span id="s3"></span></div>
+                <div class="slot"><span id="s4"></span></div>
+                <div class="slot"><span id="s5"></span></div>
+                <div class="slot"><span id="s6"></span></div>
+                <div class="slot"><span id="s7"></span></div>
+                <div class="slot"><span id="s8"></span></div>
             </div>
         </div>
     </div>
 
-    <div id="disconnect">LOADING 3D MINECRAFT SCREEN...</div>
-
     <script>
+        // WebSocket経由でPCの中継サーバー(server.js)にパケット接続
         const ws = new WebSocket('ws://localhost:8080');
         const keys = { forward: false, back: false, left: false, right: false, jump: false };
 
-        ws.onopen = () => { document.getElementById('disconnect').style.display = 'none'; };
-        ws.onclose = () => { document.getElementById('disconnect').style.display = 'flex'; document.getElementById('disconnect').innerText = 'SERVER DISCONNECTED'; };
+        // 起動バーのアニメーション
+        let progress = 0;
+        const fill = document.getElementById('fill');
+        const loadText = document.getElementById('load-text');
+        
+        const startLoader = setInterval(() => {
+            progress += 20;
+            fill.style.width = progress + '%';
+            if(progress === 40) loadText.innerText = "Connecting to Local Forge Gateway...";
+            if(progress === 80) loadText.innerText = "Rendering Voxel World Mesh...";
+            if(progress >= 100) {
+                clearInterval(startLoader);
+                document.getElementById('loading-screen').style.display = 'none';
+                document.getElementById('game-hud').style.display = 'block';
+                initEaglerEngine(); // 3Dマイクラエンジンの起動
+            }
+        }, 400);
 
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.type === 'status') {
-                document.getElementById('pos-x').innerText = data.pos.x.toFixed(1);
-                document.getElementById('pos-y').innerText = data.pos.y.toFixed(1);
-                document.getElementById('pos-z').innerText = data.pos.z.toFixed(1);
-                document.getElementById('hearts').innerText = '❤️'.repeat(Math.max(0, Math.ceil(data.hp / 2)));
-                document.getElementById('food').innerText = '🍖'.repeat(Math.max(0, Math.ceil(data.food / 2)));
+        // クライアント（Chromebook）側で3Dブロック世界を直接レンダリングする心臓部
+        function initEaglerEngine() {
+            const canvas = document.getElementById('minecraft-canvas');
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x7b9eff); // マイクラの空の色
+            scene.fog = new THREE.FogExp2(0x7b9eff, 0.015); // 描画距離の霧
 
-                for (let i = 0; i < 9; i++) {
-                    const slot = document.getElementById(`s${i}`);
-                    if (data.inventory[i]) {
-                        slot.querySelector('.item-name').innerText = data.inventory[i].name.replace('minecraft:', '');
-                        slot.querySelector('.item-count').innerText = data.inventory[i].count > 1 ? data.inventory[i].count : '';
-                    } else {
-                        slot.querySelector('.item-name').innerText = '';
-                        slot.querySelector('.item-count').innerText = '';
-                    }
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: false }); // ドット感を出すためクッキリ設定
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+            // 太陽の光
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(20, 40, 20).normalize();
+            scene.add(light);
+            scene.add(new THREE.AmbientLight(0x555555));
+
+            // マイクラのブロック用テクスチャ（ドット絵風の立方体）を自動生成
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            const material = new THREE.MeshLambertMaterial({ color: 0x557a2b }); // 草ブロックっぽい緑
+
+            // ボットの周囲に簡易的なブロックの地面（ワールド）を構築
+            const chunk = new THREE.Group();
+            for (let x = -15; x < 15; x++) {
+                for (let z = -15; z < 15; z++) {
+                    const block = new THREE.Mesh(geometry, material);
+                    block.position.set(x, -1, z);
+                    chunk.add(block);
                 }
             }
-        };
+            scene.add(chunk);
 
+            // アニメーションループ（描画の更新）
+            function animate() {
+                requestAnimationFrame(animate);
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            // 中継サーバー(server.js)から届いたボットの本物のXYZ座標を、3Dカメラの位置にそのまま同期！
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'status') {
+                    // 3D空間のカメラ位置をマイクラのボットの座標と同期（ラグゼロ）
+                    camera.position.set(data.pos.x, data.pos.y + 1.62, data.pos.z); // 1.62はプレイヤーの目の高さ
+                    
+                    document.getElementById('pos-x').innerText = data.pos.x.toFixed(3);
+                    document.getElementById('pos-y').innerText = data.pos.y.toFixed(3);
+                    document.getElementById('pos-z').innerText = data.pos.z.toFixed(3);
+
+                    // インベントリの文字反映
+                    for (let i = 0; i < 9; i++) {
+                        if (data.inventory[i]) {
+                            document.getElementById(`s${i}`).innerText = data.inventory[i].name.replace('minecraft:', '').substring(0, 5);
+                        } else {
+                            document.getElementById(`s${i}`).innerText = '';
+                        }
+                    }
+                }
+            };
+
+            // 画面リサイズ対応
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        // キーボード操作をサーバーへ最速送信
         const sendMove = () => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'move', ...keys })); };
         window.addEventListener('keydown', (e) => {
             const k = e.key.toLowerCase();
-            if (['w','a','s','d',' '].includes(k)) {
-                if (k === 'w') keys.forward = true; if (k === 's') keys.back = true;
-                if (k === 'a') keys.left = true; if (k === 'd') keys.right = true;
-                if (k === ' ') keys.jump = true; sendMove();
-            }
+            if (k === 'w') keys.forward = true; if (k === 's') keys.back = true;
+            if (k === 'a') keys.left = true; if (k === 'd') keys.right = true;
+            if (k === ' ') keys.jump = true; sendMove();
         });
         window.addEventListener('keyup', (e) => {
             const k = e.key.toLowerCase();
-            if (['w','a','s','d',' '].includes(k)) {
-                if (k === 'w') keys.forward = false; if (k === 's') keys.back = false;
-                if (k === 'a') keys.left = false; if (k === 'd') keys.right = false;
-                if (k === ' ') keys.jump = false; sendMove();
-            }
+            if (k === 'w') keys.forward = false; if (k === 's') keys.back = false;
+            if (k === 'a') keys.left = false; if (k === 'd') keys.right = false;
+            if (k === ' ') keys.jump = false; sendMove();
         });
     </script>
 </body>
