@@ -1,24 +1,35 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>WebCraft Controller</title>
-    <style>
-        body { background: #222; color: #fff; text-align: center; padding-top: 50px; }
-        input { padding: 10px; width: 200px; }
-        button { padding: 10px 20px; cursor: pointer; }
-    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>body { margin:0; background:#000; color:#fff; font-family:sans-serif; }</style>
 </head>
 <body>
-    <h1>WebCraft Launcher</h1>
-    <p>自宅PCのIPを入力してください</p>
-    <input id="ip" value="192.168.1.XX"> <button onclick="go()">マイクラ画面へ</button>
-
+    <div id="hud" style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%);">
+        <div id="hp">HP: 20</div>
+        <div id="hotbar" style="display:flex; border:2px solid #555;"></div>
+    </div>
     <script>
-        function go() {
-            const ip = document.getElementById('ip').value;
-            window.location.href = `http://${ip}:8080`;
-        }
+        // 1. シーン構築
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // 2. 通信と描画
+        const ws = new WebSocket('ws://(自宅PCのIP):8080');
+        ws.onmessage = (e) => {
+            const d = JSON.parse(e.data);
+            camera.position.set(d.pos.x, d.pos.y + 1.6, d.pos.z);
+            // 本物風HUD更新
+            document.getElementById('hp').innerText = `HP: ${Math.floor(d.health)}`;
+            // インベントリ描画処理...
+            renderer.render(scene, camera);
+        };
+        
+        // 3. 操作受付
+        document.onkeydown = (e) => ws.send(JSON.stringify({type:'move', key:e.key}));
     </script>
 </body>
 </html>
