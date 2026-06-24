@@ -2,50 +2,130 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>WebCraft Mod Client</title>
+    <title>Eaglercraft Bot Style</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #1a1a1a; font-family: sans-serif; color: #fff; }
-        #setup-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #2c2c2c; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
-        .panel { background: #3c3c3c; padding: 40px; border-radius: 8px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        h1 { color: #55ff55; font-size: 24px; margin-bottom: 25px; text-shadow: 2px 2px #000; }
-        input { width: 300px; padding: 12px; margin-bottom: 15px; background: #1e1e1e; border: 2px solid #555; color: #fff; text-align: center; font-size: 16px; border-radius: 4px; }
-        input:focus { border-color: #55ff55; outline: none; }
-        button { width: 300px; padding: 14px; background: #55ff55; color: #000; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; text-transform: uppercase; }
-        button:hover { background: #33cc33; }
-        #canvas-wrapper { width: 100%; height: 100%; display: none; }
-        iframe { width: 100%; height: 100%; border: none; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #111; font-family: monospace; }
+        #login-screen { position: absolute; top:0; left:0; width:100%; height:100%; background:#222; display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:100; }
+        .box { background:#333; padding:30px; border-radius:10px; text-align:center; color:#fff; }
+        input { width:280px; padding:12px; margin-bottom:15px; background:#111; border:1px solid #555; color:#fff; text-align:center; font-size:16px; }
+        button { padding:12px 30px; background:#55ff55; color:#000; font-weight:bold; border:none; cursor:pointer; font-size:16px; }
+        #game-canvas { width: 100%; height: 100%; display: none; }
     </style>
 </head>
 <body>
 
-    <div id="setup-screen">
-        <div class="panel">
-            <h1>🎮 WebCraft 1.20.1 Mod Client</h1>
-            <input type="text" id="host-ip" placeholder="自宅PCのIPアドレス" value="localhost"><br>
-            <input type="text" id="bot-username" placeholder="プレイヤー名" value="Goku_Player"><br>
-            <button onclick="launchGame()">テクスチャを読み込んで起動</button>
+    <div id="login-screen">
+        <div class="box">
+            <h2 style="color:#ffaa00; margin-bottom:20px;">🎮 Eaglercraft風・3Dマイクラ画面</h2>
+            <input type="text" id="server-ip" placeholder="自宅PCのIPアドレス" value="localhost"><br>
+            <input type="text" id="username" placeholder="ボット名" value="Goku_Bot"><br>
+            <button onclick="startStreamGame()">ワールドに入る</button>
         </div>
     </div>
 
-    <div id="canvas-wrapper">
-        <iframe id="game-viewport" src=""></iframe>
-    </div>
+    <div id="game-canvas"></div>
 
     <script>
-        function launchGame() {
-            const ip = document.getElementById('host-ip').value.trim();
-            const user = document.getElementById('bot-username').value.trim();
-            if (!ip || !user) return alert("入力を確認してください");
+        let ws = null;
+        const keys = { forward: false, back: false, left: false, right: false, jump: false };
+        let scene, camera, renderer, botMesh;
+        let entityMeshes = {};
 
-            document.getElementById('setup-screen').style.display = 'none';
-            document.getElementById('canvas-wrapper').style.display = 'block';
+        function startStreamGame() {
+            const ip = document.getElementById('server-ip').value.trim();
+            const user = document.getElementById('username').value.trim();
+            if (!ip || !user) return alert("入力してください");
 
-            // 1.20.1のバニラテクスチャおよび、サーバーから送られてくるMod（Forge）のカスタムブロックデータを
-            // 自動的に展開して描画してくれるWebベースのマイクラエンジンURLへ中継します。
-            const targetUrl = `https://mcraft.pages.dev/1.20.1/?server=${ip}:8080&username=${user}&texture=vanilla`;
+            init3D();
+
+            ws = new WebSocket(`ws://${ip}:8080`);
+            ws.onopen = () => ws.send(JSON.stringify({ type: 'login', username: user }));
             
-            document.getElementById('game-viewport').src = targetUrl;
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'login_success') {
+                    document.getElementById('login-screen').style.display = 'none';
+                    document.getElementById('game-canvas').style.display = 'block';
+                    setupControls();
+                }
+
+                // 自宅PCから送られてきたボットの位置と視点を、Chromebookの3D画面にそのまま同期！
+                if (data.type === 'sync_3d') {
+                    // カメラの位置をボットの目線にする
+                    camera.position.set(data.botPos.x, data.botPos.y + 1.6, data.botPos.z);
+                    
+                    // 視線の向きを反映
+                    const targetX = camera.position.x - Math.sin(data.botYaw) * Math.cos(data.botPitch);
+                    const targetY = camera.position.y + Math.sin(data.botPitch);
+                    const targetZ = camera.position.z - Math.cos(data.botYaw) * Math.cos(data.botPitch);
+                    camera.lookAt(targetX, targetY, targetZ);
+
+                    // 周りのMobやプレイヤーを立方体として3D画面に描画
+                    data.entities.forEach(e => {
+                        if (!entityMeshes[e.id]) {
+                            const geometry = new THREE.BoxGeometry(0.6, 1.8, 0.6);
+                            const material = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
+                            const mesh = new THREE.Mesh(geometry, material);
+                            scene.add(mesh);
+                            entityMeshes[e.id] = mesh;
+                        }
+                        entityMeshes[e.id].position.set(e.x, e.y + 0.9, e.z);
+                    });
+                    
+                    renderer.render(scene, camera);
+                }
+            };
+        }
+
+        // WebGLによるマイクラ風3D空間の立ち上げ
+        function init3D() {
+            const container = document.getElementById('game-canvas');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x78a7ff); // マイクラの空の色
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            // 地面（簡易グリッド）
+            const gridHelper = new THREE.GridHelper(200, 200, 0x444444, 0x222222);
+            gridHelper.position.y = 0;
+            scene.add(gridHelper);
+        }
+
+        function setupControls() {
+            const sendMove = () => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'move', ...keys })); };
+            window.addEventListener('keydown', (e) => {
+                const k = e.key.toLowerCase();
+                if (['w','a','s','d',' '].includes(k)) {
+                    if (k === 'w') keys.forward = true; if (k === 's') keys.back = true;
+                    if (k === 'a') keys.left = true; if (k === 'd') keys.right = true;
+                    if (k === ' ') keys.jump = true; sendMove();
+                }
+            });
+            window.addEventListener('keyup', (e) => {
+                const k = e.key.toLowerCase();
+                if (['w','a','s','d',' '].includes(k)) {
+                    if (k === 'w') keys.forward = false; if (k === 's') keys.back = false;
+                    if (k === 'a') keys.left = false; if (k === 'd') keys.right = false;
+                    if (k === ' ') keys.jump = false; sendMove();
+                }
+            });
+
+            // マウスを動かすと視点データを自宅PCに送る
+            let yaw = 0, pitch = 0;
+            window.addEventListener('mousemove', (e) => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    yaw -= e.movementX * 0.003;
+                    pitch -= e.movementY * 0.003;
+                    pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+                    ws.send(JSON.stringify({ type: 'look', yaw: yaw, pitch: pitch }));
+                }
+            });
         }
     </script>
 </body>
