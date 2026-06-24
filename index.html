@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Minecraft Real Web Radar</title>
+    <title>Minecraft Real Web Play v3</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
         body, html { width: 100%; height: 100%; overflow: hidden; background: #111; font-family: monospace; color: #fff; }
@@ -10,28 +10,40 @@
         .box { background: #333; padding: 30px; border-radius: 10px; text-align: center; }
         input { width: 280px; padding: 12px; margin-bottom: 15px; background: #111; border: 1px solid #555; color: #fff; text-align: center; font-size: 16px; }
         button { padding: 12px 30px; background: #55ff55; color: #000; font-weight: bold; border: none; cursor: pointer; font-size: 16px; }
-        #screen-container { width: 100%; height: 100%; display: none; }
-        iframe { width: 100%; height: 100%; border: none; }
+        
+        #screen-container { width: 100%; height: 100%; display: none; position: relative; }
+        iframe { width: 100%; height: 100%; border: none; pointer-events: none; } /* マウス入力を横取りするため非アクティブに */
+        
+        /* マウスドラッグを検知するための透明なカバー層 */
+        #input-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; cursor: move; }
+        #guide-bar { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); padding: 8px 15px; border-radius: 5px; font-size: 12px; color: #ffaa00; font-weight: bold; pointer-events: none; z-index: 20; text-align: center; }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
         <div class="box">
-            <h2 style="color:#ffaa00; margin-bottom:20px;">🎮 遠隔マイクラ・リアルタイムレーダー</h2>
+            <h2 style="color:#ffaa00; margin-bottom:20px;">🎮 遠隔マイクラ・マルチプレイ操作パネル</h2>
             <input type="text" id="server-ip" placeholder="自宅PCのIPアドレス" value="localhost"><br>
             <input type="text" id="username" placeholder="ボット名" value="Goku_Bot"><br>
-            <button onclick="startStreamGame()">ワールドを監視・操作する</button>
+            <button onclick="startStreamGame()">ワールドに入る</button>
         </div>
     </div>
 
     <div id="screen-container">
+        <div id="input-overlay"></div>
         <iframe id="live-screen" src=""></iframe>
+        <div id="guide-bar">【操作】WASD：移動 / Space：ジャンプ / 画面をドラッグ：視点変更（見回す）</div>
     </div>
 
     <script>
         let ws = null;
         const keys = { forward: false, back: false, left: false, right: false, jump: false };
+        
+        // 視点（角度）の管理変数
+        let yaw = 0;
+        let pitch = 0;
+        let isDragging = false;
 
         function startStreamGame() {
             const ip = document.getElementById('server-ip').value.trim();
@@ -51,12 +63,18 @@
                     document.getElementById('login-screen').style.display = 'none';
                     document.getElementById('screen-container').style.display = 'block';
                     document.getElementById('live-screen').src = `http://${ip}:${data.viewPort}`;
+                    
+                    setupControls();
                 }
             };
 
             ws.onerror = () => alert("接続失敗。");
-            
+        }
+
+        function setupControls() {
             const sendMove = () => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'move', ...keys })); };
+            
+            // キーボード操作
             window.addEventListener('keydown', (e) => {
                 const k = e.key.toLowerCase();
                 if (['w','a','s','d',' '].includes(k)) {
@@ -71,6 +89,32 @@
                     if (k === 'w') keys.forward = false; if (k === 's') keys.back = false;
                     if (k === 'a') keys.left = false; if (k === 'd') keys.right = false;
                     if (k === ' ') keys.jump = false; sendMove();
+                }
+            });
+
+            // マウスドラッグによる視点（首振り）操作
+            const overlay = document.getElementById('input-overlay');
+            
+            overlay.addEventListener('mousedown', () => { isDragging = true; });
+            window.addEventListener('mouseup', () => { isDragging = false; });
+            
+            overlay.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+
+                // マウスの移動量に応じてボットの視点角度を計算 (感度調整)
+                yaw -= e.movementX * 0.005;
+                pitch -= e.movementY * 0.005;
+
+                // 真上・真下を向きすぎないように制限 (マイクラの仕様制限)
+                pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+
+                // サーバーへ視点データを送信
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'look',
+                        yaw: yaw,
+                        pitch: pitch
+                    }));
                 }
             });
         }
