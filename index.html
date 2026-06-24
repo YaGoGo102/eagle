@@ -6,7 +6,7 @@
 
     <script>
         // ★ここを自分のPCのIPに書き換えること！
-        const ws = new WebSocket('ws://192.168.0.x:8080'); 
+        const ws = new WebSocket('ws://118.104.167.114:8080'); 
 
         ws.onopen = () => { document.getElementById('status').innerText = "接続成功！"; };
         ws.onmessage = (e) => {
