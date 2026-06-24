@@ -2,86 +2,89 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>⚡ C++ マイクラBE Web-NPC コントローラー ⚡</title>
+    <title>🎮 C++ Minecraft BE Web-NPC Controller 🎮</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #1e1e24; color: #fff; text-align: center; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: #2a2a35; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        input, button { padding: 10px; margin: 5px; border-radius: 6px; border: none; font-size: 16px; }
-        input { width: 60%; background: #3b3b4f; color: #fff; }
-        button { background: #4caf50; color: white; cursor: pointer; font-weight: bold; }
-        button:hover { background: #45a049; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a24; color: #fff; margin: 0; padding: 40px; text-align: center; }
+        .panel { max-width: 650px; margin: 0 auto; background: #252532; padding: 30px; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.6); border: 1px solid #3a3a4f; }
+        h2 { color: #4caf50; margin-bottom: 25px; font-size: 28px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        input, button { padding: 12px; margin: 8px; border-radius: 8px; border: none; font-size: 16px; outline: none; }
+        input { width: 55%; background: #1e1e2a; color: #fff; border: 1px solid #444; }
+        input:focus { border-color: #4caf50; }
+        button { background: #4caf50; color: white; cursor: pointer; font-weight: bold; transition: all 0.2s; }
+        button:hover { background: #45a049; transform: translateY(-1px); }
+        button:active { transform: translateY(1px); }
         .btn-danger { background: #f44336; }
         .btn-danger:hover { background: #da190b; }
-        .controls { display: grid; grid-template-columns: repeat(3, 1fr); width: 200px; margin: 20px auto; gap: 10px; }
-        .status { margin-top: 15px; font-weight: bold; color: #ffeb3b; }
+        .btn-blue { background: #00bcd4; }
+        .btn-blue:hover { background: #00acc1; }
+        .pad { display: grid; grid-template-columns: repeat(3, 1fr); width: 220px; margin: 30px auto; gap: 12px; }
+        .status { margin-top: 25px; font-size: 15px; font-weight: bold; color: #ffeb3b; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>🎮 Web-NPC 操作パネル (GitHub Pages版)</h2>
+<div class="panel">
+    <h2>🎮 Web-NPC 操作パネル (GitHub Pages)</h2>
     
     <div>
-        <input type="text" id="botName" value="Steve_Bot" placeholder="ボット名">
-        <button onclick="spawnBot()">ボットを召喚</button>
-        <button class="btn-danger" onclick="disconnectBot()">切断</button>
+        <input type="text" id="botName" value="Goku_Bot" placeholder="NPCの名前を入力...">
+        <button onclick="spawnBot()">召喚 (Spawn)</button>
+        <button class="btn-danger" onclick="disconnectBot()">切断 (Quit)</button>
     </div>
 
-    <div class="controls">
-        <td></td><button onclick="moveBot('forward')">▲ 前</button><td></td>
-        <button onclick="moveBot('left')">◀ 左</button><button onclick="moveBot('jump')">🚀 跳</button><button onclick="moveBot('right')">▶ 右</button>
-        <td></td><button onclick="moveBot('backward')">▼ 後</button><td></td>
+    <div class="pad">
+        <div></div><button onclick="moveBot('forward')">▲ 前進</button><div></div>
+        <button onclick="moveBot('left')">◀ 左折</button><button onclick="moveBot('jump')" class="btn-blue">🚀 跳躍</button><button onclick="moveBot('right')">右折 ▶</button>
+        <div></div><button onclick="moveBot('backward')">▼ 後退</button><div></div>
     </div>
 
-    <div style="margin-top: 20px;">
-        <input type="text" id="chatMsg" placeholder="チャットメッセージを入力...">
-        <button onclick="sendChat()" style="background: #2196f3;">送信</button>
+    <div style="margin-top: 25px;">
+        <input type="text" id="chatMsg" placeholder="マイクラ内へのチャットメッセージ..." style="width: 65%;">
+        <button onclick="sendChat()" style="background: #2196f3; width: 20%;">発言</button>
     </div>
 
-    <div class="status" id="wsStatus">自宅C++サーバーへ接続中...</div>
+    <div class="status" id="wsStatus">自宅のC++サーバー（WebSocket）に接続を試みています...</div>
 </div>
 
 <script>
-    // ※ 自宅PCで動いているC++サーバーのIPを指定します。
-    // 同一PCでテストする場合は localhost、スマホ等から操作する場合は自宅PCのローカルIPを入力してください。
+    // 手元のC++サーバーへ自動接続
     const socket = new WebSocket("ws://localhost:18080/ws");
 
     socket.onopen = () => {
-        document.getElementById("wsStatus").innerText = "● 自宅C++サーバーと接続完了 (通信快適)";
-        document.getElementById("wsStatus").style.color = "#4caf50";
+        const status = document.getElementById("wsStatus");
+        status.innerText = "● 自宅のC++バックエンドと接続成功！ (超快適・ラグなし)";
+        status.style.color = "#4caf50";
     };
 
     socket.onclose = () => {
-        document.getElementById("wsStatus").innerText = "❌ 自宅C++サーバーから切断されました";
-        document.getElementById("wsStatus").style.color = "#f44336";
+        const status = document.getElementById("wsStatus");
+        status.innerText = "❌ 自宅のC++バックエンドが起動していないか、切断されました";
+        status.style.color = "#f44336";
     };
 
-    function sendCommand(data) {
+    function send(data) {
         if (socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify(data));
         }
     }
 
     function spawnBot() {
-        const name = document.getElementById("botName").value;
-        sendCommand({ action: "spawn", botName: name });
+        send({ action: "spawn", botName: document.getElementById("botName").value });
     }
 
     function disconnectBot() {
-        const name = document.getElementById("botName").value;
-        sendCommand({ action: "disconnect", botName: name });
+        send({ action: "disconnect", botName: document.getElementById("botName").value });
     }
 
     function moveBot(dir) {
-        const name = document.getElementById("botName").value;
-        sendCommand({ action: "move", botName: name, direction: dir });
+        send({ action: "move", botName: document.getElementById("botName").value, direction: dir });
     }
 
     function sendChat() {
-        const name = document.getElementById("botName").value;
-        const msg = document.getElementById("chatMsg").value;
-        sendCommand({ action: "chat", botName: name, message: msg });
-        document.getElementById("chatMsg").value = "";
+        const msgInput = document.getElementById("chatMsg");
+        if(!msgInput.value) return;
+        send({ action: "chat", botName: document.getElementById("botName").value, message: msgInput.value });
+        msgInput.value = "";
     }
 </script>
 
