@@ -1,11 +1,18 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <meta charset="UTF-8">
-    <title>Goku Bot Control</title>
-</head>
-<body>
-    <h1>マイクラボット操作画面</h1>
-    <div id="status">接続を待機しています...</div>
+<body style="margin:0; overflow:hidden;">
+    <canvas id="view"></canvas>
+    <script>
+        const canvas = document.getElementById('view');
+        const ctx = canvas.getContext('2d');
+        const ws = new WebSocket('ws://localhost:8080');
+
+        // ここに「マイクラの視界を描画するプログラム」を書く
+        ws.onmessage = (e) => {
+            const packet = JSON.parse(e.data);
+            // 本家マイクラと同じ角度・位置をブラウザ上の3D空間に反映する処理
+            console.log("パケット受信:", packet);
+        };
+    </script>
 </body>
 </html>
