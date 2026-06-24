@@ -1,52 +1,35 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <title>WebCraft Mod Client</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #1a1a1a; font-family: sans-serif; color: #fff; }
-        #setup-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #2c2c2c; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
-        .panel { background: #3c3c3c; padding: 40px; border-radius: 8px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        h1 { color: #55ff55; font-size: 24px; margin-bottom: 25px; text-shadow: 2px 2px #000; }
-        input { width: 300px; padding: 12px; margin-bottom: 15px; background: #1e1e1e; border: 2px solid #555; color: #fff; text-align: center; font-size: 16px; border-radius: 4px; }
-        input:focus { border-color: #55ff55; outline: none; }
-        button { width: 300px; padding: 14px; background: #55ff55; color: #000; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; text-transform: uppercase; }
-        button:hover { background: #33cc33; }
-        #canvas-wrapper { width: 100%; height: 100%; display: none; }
-        iframe { width: 100%; height: 100%; border: none; }
-    </style>
-</head>
-<body>
+const mineflayer = require('mineflayer');
+const { WebSocketServer } = require('ws');
 
-    <div id="setup-screen">
-        <div class="panel">
-            <h1>🎮 WebCraft 1.20.1 Mod Client</h1>
-            <input type="text" id="host-ip" placeholder="自宅PCのIPアドレス" value="localhost"><br>
-            <input type="text" id="bot-username" placeholder="プレイヤー名" value="Goku_Player"><br>
-            <button onclick="launchGame()">テクスチャを読み込んで起動</button>
-        </div>
-    </div>
+const wss = new WebSocketServer({ port: 8080 });
 
-    <div id="canvas-wrapper">
-        <iframe id="game-viewport" src=""></iframe>
-    </div>
-
-    <script>
-        function launchGame() {
-            const ip = document.getElementById('host-ip').value.trim();
-            const user = document.getElementById('bot-username').value.trim();
-            if (!ip || !user) return alert("入力を確認してください");
-
-            document.getElementById('setup-screen').style.display = 'none';
-            document.getElementById('canvas-wrapper').style.display = 'block';
-
-            // 1.20.1のバニラテクスチャおよび、サーバーから送られてくるMod（Forge）のカスタムブロックデータを
-            // 自動的に展開して描画してくれるWebベースのマイクラエンジンURLへ中継します。
-            const targetUrl = `https://mcraft.pages.dev/1.20.1/?server=${ip}:8080&username=${user}&texture=vanilla`;
-            
-            document.getElementById('game-viewport').src = targetUrl;
-        }
-    </script>
-</body>
-</html>
+wss.on('connection', (ws) => {
+    let myBot = null;
+    ws.on('message', (message) => {
+        try {
+            const data = JSON.parse(message);
+            if (data.type === 'login' && !myBot) {
+                myBot = mineflayer.createBot({
+                    host: 'localhost',
+                    port: 25565,
+                    username: data.username,
+                    version: '1.20.1',
+                    skipValidation: true
+                });
+                myBot.on('spawn', () => ws.send(JSON.stringify({ type: 'login_success' })));
+                myBot.on('error', (err) => console.log(err));
+            }
+            if (data.type === 'move' && myBot) {
+                myBot.setControlState('forward', data.forward);
+                myBot.setControlState('back', data.back);
+                myBot.setControlState('left', data.left);
+                myBot.setControlState('right', data.right);
+                myBot.setControlState('jump', data.jump);
+            }
+            if (data.type === 'look' && myBot) {
+                myBot.look(data.yaw, data.pitch, true);
+            }
+        } catch (e) {}
+    });
+});
+console.log('🚀 安定版サーバー起動中...');
