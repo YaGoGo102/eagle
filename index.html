@@ -2,28 +2,113 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Web-Forge Client</title>
-    <script src="eaglercraftx.js"></script>
+    <title>WebCraft Improved</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
+        #login-screen { position: absolute; top:0; left:0; width:100%; height:100%; background:#222; display:flex; justify-content:center; align-items:center; z-index:100; }
+        .box { background:#333; padding:30px; border-radius:10px; text-align:center; color:#fff; }
+        input { width:280px; padding:12px; margin-bottom:15px; background:#111; border:1px solid #555; color:#fff; text-align:center; font-size:16px; }
+        button { padding:12px 30px; background:#55ff55; color:#000; font-weight:bold; border:none; cursor:pointer; font-size:16px; }
+        #game-canvas { width: 100%; height: 100%; display: none; cursor: crosshair; }
+    </style>
 </head>
 <body>
-    <div id="game_container" style="width:100vw; height:100vh;"></div>
+
+    <div id="login-screen">
+        <div class="box">
+            <h2 style="margin-bottom:20px;">🎮 WebCraft 3D Client</h2>
+            <input type="text" id="server-ip" value="localhost"><br>
+            <input type="text" id="username" value="Goku_Bot"><br>
+            <button onclick="startStreamGame()">参加する</button>
+        </div>
+    </div>
+
+    <div id="game-canvas"></div>
 
     <script>
-        // WebSocketの接続先をあなたのWSSサーバーに向ける
-        window.eaglercraftXOpts = {
-            container: "game_container",
-            assetsURI: "assets.epk",
-            serverAddress: "wss://あなたのドメインまたはIP:8080", 
-            hideBanner: true,
-            // 最新Forge Modサーバーとの互換性を保つための設定
-            checkInterval: 2000,
-            joinDelay: 500
-        };
+        let ws = null;
+        const keys = { forward: false, back: false, left: false, right: false, jump: false };
+        let scene, camera, renderer, entityMeshes = {};
+        const textureLoader = new THREE.TextureLoader();
         
-        // クライアントを起動
-        window.addEventListener("load", () => {
-            eaglercraftX.startGame();
-        });
+        // マイクラっぽいテクスチャ（外部の公開素材を利用）
+        const blockTexture = textureLoader.load('https://threejs.org/examples/textures/crate.gif');
+
+        function startStreamGame() {
+            const ip = document.getElementById('server-ip').value.trim();
+            const user = document.getElementById('username').value.trim();
+            
+            init3D();
+
+            ws = new WebSocket(`ws://${ip}:8080`);
+            ws.onopen = () => ws.send(JSON.stringify({ type: 'login', username: user }));
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'login_success') {
+                    document.getElementById('login-screen').style.display = 'none';
+                    document.getElementById('game-canvas').style.display = 'block';
+                    document.getElementById('game-canvas').requestPointerLock(); // クリックで視点移動
+                    setupControls();
+                }
+                if (data.type === 'sync_3d') {
+                    camera.position.set(data.botPos.x, data.botPos.y + 1.6, data.botPos.z);
+                    const targetX = camera.position.x - Math.sin(data.botYaw) * Math.cos(data.botPitch);
+                    const targetY = camera.position.y + Math.sin(data.botPitch);
+                    const targetZ = camera.position.z - Math.cos(data.botYaw) * Math.cos(data.botPitch);
+                    camera.lookAt(targetX, targetY, targetZ);
+
+                    data.entities.forEach(e => {
+                        if (!entityMeshes[e.id]) {
+                            const mat = new THREE.MeshBasicMaterial({ map: blockTexture });
+                            const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.8, 0.6), mat);
+                            scene.add(mesh);
+                            entityMeshes[e.id] = mesh;
+                        }
+                        entityMeshes[e.id].position.set(e.x, e.y + 0.9, e.z);
+                    });
+                    renderer.render(scene, camera);
+                }
+            };
+        }
+
+        function init3D() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('game-canvas').appendChild(renderer.domElement);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        }
+
+        function setupControls() {
+            window.addEventListener('keydown', (e) => {
+                if(e.key === 'w') keys.forward = true;
+                if(e.key === 's') keys.back = true;
+                if(e.key === 'a') keys.left = true;
+                if(e.key === 'd') keys.right = true;
+                if(e.key === ' ') keys.jump = true;
+                ws.send(JSON.stringify({ type: 'move', ...keys }));
+            });
+            window.addEventListener('keyup', (e) => {
+                if(e.key === 'w') keys.forward = false;
+                if(e.key === 's') keys.back = false;
+                if(e.key === 'a') keys.left = false;
+                if(e.key === 'd') keys.right = false;
+                if(e.key === ' ') keys.jump = false;
+                ws.send(JSON.stringify({ type: 'move', ...keys }));
+            });
+            window.addEventListener('mousemove', (e) => {
+                if(document.pointerLockElement) {
+                    let yaw = 0, pitch = 0;
+                    yaw -= e.movementX * 0.002;
+                    pitch -= e.movementY * 0.002;
+                    ws.send(JSON.stringify({ type: 'look', yaw: yaw, pitch: pitch }));
+                }
+            });
+        }
     </script>
 </body>
 </html>
