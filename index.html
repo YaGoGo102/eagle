@@ -2,118 +2,85 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Minecraft Web Remote Multi-Controller</title>
+    <title>Minecraft Real Web Play</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #222; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
-        .container { max-width: 500px; margin: 0 auto; background: #333; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        h1 { font-size: 24px; color: #ffaa00; margin-bottom: 20px; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #111; font-family: monospace; color: #fff; }
         
-        .input-group { text-align: left; margin-bottom: 15px; }
-        label { display: block; font-size: 14px; color: #aaa; margin-bottom: 5px; }
-        .input-box { width: 100%; padding: 10px; font-size: 16px; background: #444; border: 1px solid #555; color: #fff; border-radius: 5px; }
-        .input-box:focus { border-color: #ffaa00; outline: none; }
-        
-        .btn { width: 100%; padding: 12px; font-size: 16px; background: #55ff55; color: #000; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .btn:hover { background: #44dd44; }
+        #login-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #222; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100;
+        }
+        .box { background: #333; padding: 30px; border-radius: 10px; text-align: center; }
+        input { width: 280px; padding: 12px; margin-bottom: 15px; background: #111; border: 1px solid #555; color: #fff; text-align: center; font-size: 16px; }
+        button { padding: 12px 30px; background: #55ff55; color: #000; font-weight: bold; border: none; cursor: pointer; font-size: 16px; }
 
-        #game-panel { display: none; margin-top: 20px; }
-        .status { font-size: 18px; color: #55ff55; margin: 15px 0; font-family: monospace; }
-        .controls-info { background: #444; padding: 15px; border-radius: 5px; color: #ffaa00; font-weight: bold; line-height: 1.6; }
+        #screen-container { width: 100%; height: 100%; display: none; }
+        iframe { width: 100%; height: 100%; border: none; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>🤖 Web Minecraft Bot コントローラー</h1>
-        
-        <div id="login-form">
-            <div class="input-group">
-                <label>自宅PCのIPアドレス (または localhost)</label>
-                <input type="text" id="server-ip" class="input-box" value="localhost">
-            </div>
-            <div class="input-group">
-                <label>参加させるボットの名前</label>
-                <input type="text" id="username" class="input-box" value="Goku_Bot" maxlength="16">
-            </div>
-            <button class="btn" onclick="connectBot()">サーバーに参加させる</button>
+    <div id="login-screen">
+        <div class="box">
+            <h2 style="color:#ffaa00; margin-bottom:20px;">🎮 遠隔マイクラ本物画面ログイン</h2>
+            <input type="text" id="server-ip" placeholder="自宅PCのIPアドレス" value="localhost"><br>
+            <input type="text" id="username" placeholder="ボット名" value="Goku_Bot"><br>
+            <button onclick="startStreamGame()">ワールドに入る</button>
         </div>
+    </div>
 
-        <div id="game-panel">
-            <div class="status">👤 プレイヤー: <span id="active-user">-</span></div>
-            <div class="status">📍 現在座標: <span id="bot-xyz">X: 0.0, Y: 0.0, Z: 0.0</span></div>
-            
-            <div class="controls-info">
-                【操作方法】<br>
-                キーボードの <strong>W, A, S, D</strong> で移動<br>
-                <strong>Spaceキー</strong> でジャンプ<br>
-                <span style="color:#aaa; font-size:12px; font-weight:normal;">（このタブを閉じるとボットは自動で退出します）</span>
-            </div>
-        </div>
+    <div id="screen-container">
+        <iframe id="live-screen" src=""></iframe>
     </div>
 
     <script>
         let ws = null;
         const keys = { forward: false, back: false, left: false, right: false, jump: false };
 
-        function connectBot() {
+        function startStreamGame() {
             const ip = document.getElementById('server-ip').value.trim();
             const user = document.getElementById('username').value.trim();
+            if (!ip || !user) return alert("入力してください");
 
-            if (!ip || !user) return alert("IPアドレスと名前を入力してください！");
-
-            // 自宅PCの server.js にWebSocket接続
+            // 人ごとに3000番〜のポートを自動割り当て
+            const myViewPort = Math.floor(Math.random() * 100) + 3000;
             ws = new WebSocket(`ws://${ip}:8080`);
 
             ws.onopen = () => {
-                // ログイン要求を送信
-                ws.send(JSON.stringify({ type: 'login', username: user }));
-
-                // 画面表示の切り替え
-                document.getElementById('login-form').style.display = 'none';
-                document.getElementById('game-panel').style.display = 'block';
-                document.getElementById('active-user').innerText = user;
+                ws.send(JSON.stringify({ type: 'login', username: user, viewPort: myViewPort }));
             };
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                if (data.type === 'status') {
-                    // 座標データのリアルタイム更新
-                    document.getElementById('bot-xyz').innerText = 
-                        `X: ${data.pos.x.toFixed(1)}, Y: ${data.pos.y.toFixed(1)}, Z: ${data.pos.z.toFixed(1)}`;
+                if (data.type === 'login_success') {
+                    document.getElementById('login-screen').style.display = 'none';
+                    document.getElementById('screen-container').style.display = 'block';
+                    // 自宅PCの配信ポートの映像をそのまま画面いっぱいに映す！
+                    document.getElementById('live-screen').src = `http://${ip}:${data.viewPort}`;
                 }
             };
 
-            ws.onerror = () => {
-                alert("自宅のサーバーに接続できませんでした。IPアドレスかバッチファイルを確認してください。");
-            };
-
-            ws.onclose = () => {
-                alert("サーバーから切断されました。");
-                location.reload();
-            };
+            ws.onerror = () => alert("接続失敗。");
+            
+            const sendMove = () => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'move', ...keys })); };
+            window.addEventListener('keydown', (e) => {
+                const k = e.key.toLowerCase();
+                if (['w','a','s','d',' '].includes(k)) {
+                    if (k === 'w') keys.forward = true; if (k === 's') keys.back = true;
+                    if (k === 'a') keys.left = true; if (k === 'd') keys.right = true;
+                    if (k === ' ') keys.jump = true; sendMove();
+                }
+            });
+            window.addEventListener('keyup', (e) => {
+                const k = e.key.toLowerCase();
+                if (['w','a','s','d',' '].includes(k)) {
+                    if (k === 'w') keys.forward = false; if (k === 's') keys.back = false;
+                    if (k === 'a') keys.left = false; if (k === 'd') keys.right = false;
+                    if (k === ' ') keys.jump = false; sendMove();
+                }
+            });
         }
-
-        // WASD・宇宙キーの入力を監視して中継サーバーへ即座に送信
-        const sendMove = () => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'move', ...keys })); };
-        
-        window.addEventListener('keydown', (e) => {
-            const k = e.key.toLowerCase();
-            if (['w','a','s','d',' '].includes(k)) {
-                if (k === 'w') keys.forward = true; if (k === 's') keys.back = true;
-                if (k === 'a') keys.left = true; if (k === 'd') keys.right = true;
-                if (k === ' ') keys.jump = true; sendMove();
-            }
-        });
-
-        window.addEventListener('keyup', (e) => {
-            const k = e.key.toLowerCase();
-            if (['w','a','s','d',' '].includes(k)) {
-                if (k === 'w') keys.forward = false; if (k === 's') keys.back = false;
-                if (k === 'a') keys.left = false; if (k === 'd') keys.right = false;
-                if (k === ' ') keys.jump = false; sendMove();
-            }
-        });
     </script>
 </body>
 </html>
