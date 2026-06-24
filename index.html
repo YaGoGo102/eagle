@@ -2,64 +2,68 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>🎮 C++ Minecraft BE Web-NPC Controller 🎮</title>
+    <title>🎮 EaglerStyle マイクラWeb-NPC コントローラー 🎮</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a24; color: #fff; margin: 0; padding: 40px; text-align: center; }
-        .panel { max-width: 650px; margin: 0 auto; background: #252532; padding: 30px; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.6); border: 1px solid #3a3a4f; }
-        h2 { color: #4caf50; margin-bottom: 25px; font-size: 28px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #12121a; color: #fff; margin: 0; padding: 40px; text-align: center; }
+        .panel { max-width: 650px; margin: 0 auto; background: #1c1c27; padding: 30px; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.7); border: 1px solid #2d2d3f; }
+        h2 { color: #00e676; margin-bottom: 5px; font-size: 26px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .subtitle { color: #aaa; margin-bottom: 25px; font-size: 14px; }
         input, button { padding: 12px; margin: 8px; border-radius: 8px; border: none; font-size: 16px; outline: none; }
-        input { width: 55%; background: #1e1e2a; color: #fff; border: 1px solid #444; }
-        input:focus { border-color: #4caf50; }
-        button { background: #4caf50; color: white; cursor: pointer; font-weight: bold; transition: all 0.2s; }
-        button:hover { background: #45a049; transform: translateY(-1px); }
-        button:active { transform: translateY(1px); }
-        .btn-danger { background: #f44336; }
-        .btn-danger:hover { background: #da190b; }
-        .btn-blue { background: #00bcd4; }
-        .btn-blue:hover { background: #00acc1; }
-        .pad { display: grid; grid-template-columns: repeat(3, 1fr); width: 220px; margin: 30px auto; gap: 12px; }
-        .status { margin-top: 25px; font-size: 15px; font-weight: bold; color: #ffeb3b; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; }
+        input { width: 55%; background: #0f0f15; color: #fff; border: 1px solid #333; text-align: center; }
+        input:focus { border-color: #00e676; }
+        button { background: #00e676; color: #000; cursor: pointer; font-weight: bold; transition: all 0.1s; }
+        button:hover { background: #66ffa6; transform: translateY(-1px); }
+        .btn-danger { background: #ff1744; color: white; }
+        .btn-danger:hover { background: #ff5252; }
+        
+        /* 操作ガイドのキーボード風UI */
+        .key-guide { display: grid; grid-template-columns: repeat(3, 1fr); width: 180px; margin: 20px auto; gap: 8px; }
+        .key { background: #2d2d3f; padding: 15px; border-radius: 8px; font-weight: bold; font-size: 18px; border-bottom: 4px solid #151520; box-shadow: 0 4px 0 #111; user-select: none; }
+        .key.active { background: #00e676; color: #000; border-bottom: 0px; margin-top: 4px; box-shadow: none; }
+        .space-key { width: 180px; margin: 10px auto; padding: 10px; font-size: 14px; }
+
+        .status { margin-top: 25px; font-size: 14px; font-weight: bold; color: #ffd700; background: rgba(0,0,0,0.4); padding: 12px; border-radius: 8px; }
     </style>
 </head>
 <body>
 
 <div class="panel">
-    <h2>🎮 Web-NPC 操作パネル (GitHub Pages)</h2>
+    <h2>🎮 EaglerStyle Web コントローラー</h2>
+    <div class="subtitle">画面を開いた状態で【 W / A / S / D 】や【 Space 】キーを押して操作</div>
     
     <div>
-        <input type="text" id="botName" value="Goku_Bot" placeholder="NPCの名前を入力...">
-        <button onclick="spawnBot()">召喚 (Spawn)</button>
-        <button class="btn-danger" onclick="disconnectBot()">切断 (Quit)</button>
+        <input type="text" id="botName" value="Goku_Bot" placeholder="NPCの名前...">
+        <button onclick="spawnBot()">世界へ召喚</button>
+        <button class="btn-danger" onclick="disconnectBot()">切断</button>
     </div>
 
-    <div class="pad">
-        <div></div><button onclick="moveBot('forward')">▲ 前進</button><div></div>
-        <button onclick="moveBot('left')">◀ 左折</button><button onclick="moveBot('jump')" class="btn-blue">🚀 跳躍</button><button onclick="moveBot('right')">右折 ▶</button>
-        <div></div><button onclick="moveBot('backward')">▼ 後退</button><div></div>
+    <div class="key-guide">
+        <div></div><div class="key" id="key-w">W</div><div></div>
+        <div class="key" id="key-a">A</div><div class="key" id="key-s">S</div><div class="key" id="key-d">D</div>
     </div>
+    <div class="key space-key" id="key-space">SPACE (JUMP)</div>
 
     <div style="margin-top: 25px;">
-        <input type="text" id="chatMsg" placeholder="マイクラ内へのチャットメッセージ..." style="width: 65%;">
-        <button onclick="sendChat()" style="background: #2196f3; width: 20%;">発言</button>
+        <input type="text" id="chatMsg" placeholder="Tキーを押すか、ここに入力してEnterで発言...">
+        <button onclick="sendChat()" style="background: #29b6f6; color: white;">送信</button>
     </div>
 
-    <div class="status" id="wsStatus">自宅のC++サーバー（WebSocket）に接続を試みています...</div>
+    <div class="status" id="wsStatus">自宅のC++サーバーに接続中...</div>
 </div>
 
 <script>
-    // 手元のC++サーバーへ自動接続
     const socket = new WebSocket("ws://localhost:18080/ws");
 
     socket.onopen = () => {
         const status = document.getElementById("wsStatus");
-        status.innerText = "● 自宅のC++バックエンドと接続成功！ (超快適・ラグなし)";
-        status.style.color = "#4caf50";
+        status.innerText = "● 自宅のC++サーバーと接続完了！ キーボード操作を受け付けています。";
+        status.style.color = "#00e676";
     };
 
     socket.onclose = () => {
         const status = document.getElementById("wsStatus");
-        status.innerText = "❌ 自宅のC++バックエンドが起動していないか、切断されました";
-        status.style.color = "#f44336";
+        status.innerText = "❌ 自宅のC++サーバーが起動していません";
+        status.style.color = "#ff1744";
     };
 
     function send(data) {
@@ -68,24 +72,55 @@
         }
     }
 
-    function spawnBot() {
-        send({ action: "spawn", botName: document.getElementById("botName").value });
-    }
-
-    function disconnectBot() {
-        send({ action: "disconnect", botName: document.getElementById("botName").value });
-    }
-
-    function moveBot(dir) {
-        send({ action: "move", botName: document.getElementById("botName").value, direction: dir });
-    }
-
+    function spawnBot() { send({ action: "spawn", botName: document.getElementById("botName").value }); }
+    function disconnectBot() { send({ action: "disconnect", botName: document.getElementById("botName").value }); }
     function sendChat() {
         const msgInput = document.getElementById("chatMsg");
         if(!msgInput.value) return;
         send({ action: "chat", botName: document.getElementById("botName").value, message: msgInput.value });
         msgInput.value = "";
     }
+
+    // ─── 🔥 本家リスペクト・キーボードリアルタイム連動システム ───
+    const activeKeys = {};
+
+    window.addEventListener("keydown", (e) => {
+        // チャット入力欄にフォーカスがあるときは入力を邪魔しない
+        if (document.activeElement === document.getElementById("chatMsg")) {
+            if (e.key === "Enter") sendChat();
+            return;
+        }
+
+        const botName = document.getElementById("botName").value;
+        const key = e.key.toLowerCase();
+
+        // チャットを開く「T」キーのシミュレート
+        if (key === "t") {
+            e.preventDefault();
+            document.getElementById("chatMsg").focus();
+            return;
+        }
+
+        if (activeKeys[key]) return; // 長押しによるパケット乱打防止
+        activeKeys[key] = true;
+
+        if (key === "w") { document.getElementById("key-w").classList.add("active"); send({ action: "move", botName, direction: "forward" }); }
+        if (key === "s") { document.getElementById("key-s").classList.add("active"); send({ action: "move", botName, direction: "backward" }); }
+        if (key === "a") { document.getElementById("key-a").classList.add("active"); send({ action: "move", botName, direction: "left" }); }
+        if (key === "d") { document.getElementById("key-d").classList.add("active"); send({ action: "move", botName, direction: "right" }); }
+        if (e.key === " ") { e.preventDefault(); document.getElementById("key-space").classList.add("active"); send({ action: "move", botName, direction: "jump" }); }
+    });
+
+    window.addEventListener("keyup", (e) => {
+        const key = e.key.toLowerCase();
+        activeKeys[key] = false;
+
+        if (key === "w") document.getElementById("key-w").classList.remove("active");
+        if (key === "s") document.getElementById("key-s").classList.remove("active");
+        if (key === "a") document.getElementById("key-a").classList.remove("active");
+        if (key === "d") document.getElementById("key-d").classList.remove("active");
+        if (e.key === " ") document.getElementById("key-space").classList.remove("active");
+    });
 </script>
 
 </body>
