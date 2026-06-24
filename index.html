@@ -2,24 +2,43 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Eaglercraft Style Web Minecraft (Texture Ver)</title>
+    <title>Eaglercraft Dynamic Multi-Bot</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
         body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: monospace; color: #fff; }
-        #minecraft-canvas { width: 100%; height: 100%; display: block; }
-        #game-hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        #minecraft-canvas { width: 100%; height: 100%; display: none; } /* 初期状態は非表示 */
+        #game-hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: none; }
         #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; color: rgba(255,255,255,0.4); }
         #f3-menu { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.4); padding: 8px; font-size: 12px; }
+
+        /* マイクラ風マルチプレイログイン画面 */
+        #login-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('https://source.unsplash.com/random/1920x1080/?minecraft,dirt') center/cover;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100;
+        }
+        .menu-title { font-size: 36px; font-weight: bold; margin-bottom: 40px; text-shadow: 3px 3px #000; color: #ffaa00; }
+        .input-box { padding: 12px; width: 300px; font-size: 16px; background: #222; border: 2px solid #555; color: #fff; text-align: center; margin-bottom: 20px; outline: none; }
+        .input-box:focus { border-color: #ffaa00; }
+        .btn { padding: 12px 30px; font-size: 16px; background: #555; border: 2px solid #888; color: #fff; cursor: pointer; font-weight: bold; text-shadow: 1px 1px #000; box-shadow: inset -2px -2px #222, inset 2px 2px #fff; }
+        .btn:hover { background: #666; border-color: #ffaa00; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
+    <div id="login-screen">
+        <div class="menu-title">MINECRAFT WEB LOGIN</div>
+        <input type="text" id="username" class="input-box" placeholder="プレイヤー名を入力..." maxlength="16" value="Goku_Player">
+        <button class="btn" onclick="connectToGame()">マルチプレイに参加</button>
+    </div>
+
     <canvas id="minecraft-canvas"></canvas>
 
     <div id="game-hud">
         <div id="f3-menu">
-            Eaglercraft Web Edition (Texture Loaded)<br>
+            Eaglercraft Engine v2<br>
+            Player: <span id="player-name-hud">None</span><br>
             XYZ: <span id="pos-x">0.0</span> / <span id="pos-y">0.0</span> / <span id="pos-z">0.0</span>
         </div>
         <div id="crosshair">+</div>
@@ -29,87 +48,92 @@
         const ws = new WebSocket('ws://localhost:8080');
         const keys = { forward: false, back: false, left: false, right: false, jump: false };
 
-        // 3Dエンジンの初期化
-        const canvas = document.getElementById('minecraft-canvas');
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x7b9eff);
-        scene.fog = new THREE.FogExp2(0x7b9eff, 0.02);
+        function connectToGame() {
+            const user = document.getElementById('username').value.trim();
+            if(!user) return alert("名前を入力してください！");
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: false });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-
-        // ライティング
-        const light = new THREE.DirectionalLight(0xffffff, 0.9);
-        light.position.set(10, 20, 10).normalize();
-        scene.add(light);
-        scene.add(new THREE.AmbientLight(0x666666));
-
-        // ★自宅サーバーからテクスチャ画像を読み込む重要ポイント★
-        const textureLoader = new THREE.TextureLoader();
-        // 自宅サーバーのポート8081から画像を引っ張ってくる
-        const blockTexture = textureLoader.load('http://localhost:8081/texture.png');
-        
-        // マイクラのボケないドット絵感を出すための魔法の設定（NearestFilter）
-        blockTexture.magFilter = THREE.NearestFilter;
-        blockTexture.minFilter = THREE.NearestFilter;
-
-        const geometry = new THREE.BoxGeometry(1, 1, 1);
-        const material = new THREE.MeshLambertMaterial({ map: blockTexture }); // テクスチャを適用！
-
-        // 地面（ワールド）の自動生成
-        const chunk = new THREE.Group();
-        for (let x = -15; x < 15; x++) {
-            for (let z = -15; z < 15; z++) {
-                const block = new THREE.Mesh(geometry, material);
-                block.position.set(x, -1, z);
-                chunk.add(block);
+            // サーバーへ「この名前でログインして！」とリクエストを送る
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'login', username: user }));
+                
+                // 画面の切り替え
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('minecraft-canvas').style.display = 'block';
+                document.getElementById('game-hud').style.display = 'block';
+                document.getElementById('player-name-hud').innerText = user;
+                
+                initEaglerEngine();
+            } else {
+                alert("自宅の中継サーバー(server.js)に接続できません。バッチファイルを確認してください。");
             }
         }
-        scene.add(chunk);
 
-        // 描画ループ
-        function animate() {
-            requestAnimationFrame(animate);
-            renderer.render(scene, camera);
-        }
-        animate();
+        function initEaglerEngine() {
+            const canvas = document.getElementById('minecraft-canvas');
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x7b9eff);
+            scene.fog = new THREE.FogExp2(0x7b9eff, 0.02);
 
-        // ボットの座標と同期
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.type === 'status') {
-                camera.position.set(data.pos.x, data.pos.y + 1.62, data.pos.z);
-                document.getElementById('pos-x').innerText = data.pos.x.toFixed(2);
-                document.getElementById('pos-y').innerText = data.pos.y.toFixed(2);
-                document.getElementById('pos-z').innerText = data.pos.z.toFixed(2);
-            }
-        };
-
-        // 操作の最速送信
-        const sendMove = () => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'move', ...keys })); };
-        window.addEventListener('keydown', (e) => {
-            const k = e.key.toLowerCase();
-            if (['w','a','s','d',' '].includes(k)) {
-                if (k === 'w') keys.forward = true; if (k === 's') keys.back = true;
-                if (k === 'a') keys.left = true; if (k === 'd') keys.right = true;
-                if (k === ' ') keys.jump = true; sendMove();
-            }
-        });
-        window.addEventListener('keyup', (e) => {
-            const k = e.key.toLowerCase();
-            if (['w','a','s','d',' '].includes(k)) {
-                if (k === 'w') keys.forward = false; if (k === 's') keys.back = false;
-                if (k === 'a') keys.left = false; if (k === 'd') keys.right = false;
-                if (k === ' ') keys.jump = false; sendMove();
-            }
-        });
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: false });
             renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+
+            // ライトとテクスチャ設定
+            const light = new THREE.DirectionalLight(0xffffff, 0.9);
+            light.position.set(10, 20, 10).normalize();
+            scene.add(light, new THREE.AmbientLight(0x666666));
+
+            const textureLoader = new THREE.TextureLoader();
+            const blockTexture = textureLoader.load('http://localhost:8081/texture.png');
+            blockTexture.magFilter = THREE.NearestFilter;
+            blockTexture.minFilter = THREE.NearestFilter;
+
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            const material = new THREE.MeshLambertMaterial({ map: blockTexture });
+
+            const chunk = new THREE.Group();
+            for (let x = -15; x < 15; x++) {
+                for (let z = -15; z < 15; z++) {
+                    const block = new THREE.Mesh(geometry, material);
+                    block.position.set(x, -1, z);
+                    chunk.add(block);
+                }
+            }
+            scene.add(chunk);
+
+            function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
+            animate();
+
+            // 座標同期
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'status') {
+                    camera.position.set(data.pos.x, data.pos.y + 1.62, data.pos.z);
+                    document.getElementById('pos-x').innerText = data.pos.x.toFixed(2);
+                    document.getElementById('pos-y').innerText = data.pos.y.toFixed(2);
+                    document.getElementById('pos-z').innerText = data.pos.z.toFixed(2);
+                }
+            };
+
+            // 操作送信
+            const sendMove = () => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'move', ...keys })); };
+            window.addEventListener('keydown', (e) => {
+                const k = e.key.toLowerCase();
+                if (['w','a','s','d',' '].includes(k)) {
+                    if (k === 'w') keys.forward = true; if (k === 's') keys.back = true;
+                    if (k === 'a') keys.left = true; if (k === 'd') keys.right = true;
+                    if (k === ' ') keys.jump = true; sendMove();
+                }
+            });
+            window.addEventListener('keyup', (e) => {
+                const k = e.key.toLowerCase();
+                if (['w','a','s','d',' '].includes(k)) {
+                    if (k === 'w') keys.forward = false; if (k === 's') keys.back = false;
+                    if (k === 'a') keys.left = false; if (k === 'd') keys.right = false;
+                    if (k === ' ') keys.jump = false; sendMove();
+                }
+            });
+        }
     </script>
 </body>
 </html>
