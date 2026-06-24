@@ -92,4 +92,31 @@
                 data.items.forEach((item, index) => {
                     if (index < 9) {
                         document.getElementById(`item-${index}`).innerText = item.name;
-                        document.getElementById(`count-${index}`).innerText = item.count >
+                        document.getElementById(`count-${index}`).innerText = item.count > 1 ? item.count : "";
+                    }
+                });
+            }
+        }
+    };
+
+    socket.onopen = () => { document.getElementById("wsStatus").innerText = "● 接続成功！ WASDで操作可能"; };
+
+    function spawnBot() {
+        if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ action: "spawn", botName: document.getElementById("botName").value }));
+        }
+    }
+
+    // キーボード操作の送信
+    window.addEventListener("keydown", (e) => {
+        if (document.activeElement === document.getElementById("chatMsg")) return;
+        const key = e.key.toLowerCase();
+        const botName = document.getElementById("botName").value;
+        if (["w", "a", "s", "d", " "].includes(key)) {
+            let dir = key === "w" ? "forward" : key === "s" ? "backward" : key === "a" ? "left" : key === "d" ? "right" : "jump";
+            socket.send(JSON.stringify({ action: "move", botName, direction: dir }));
+        }
+    });
+</script>
+</body>
+</html>
