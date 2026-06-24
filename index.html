@@ -2,11 +2,11 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Eaglercraft Dynamic Multi-Bot</title>
+    <title>Eaglercraft Style Web Minecraft (IP Connect Ver)</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
         body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: monospace; color: #fff; }
-        #minecraft-canvas { width: 100%; height: 100%; display: none; } /* 初期状態は非表示 */
+        #minecraft-canvas { width: 100%; height: 100%; display: none; }
         #game-hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: none; }
         #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; color: rgba(255,255,255,0.4); }
         #f3-menu { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.4); padding: 8px; font-size: 12px; }
@@ -14,13 +14,18 @@
         /* マイクラ風マルチプレイログイン画面 */
         #login-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('https://source.unsplash.com/random/1920x1080/?minecraft,dirt') center/cover;
+            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('https://source.unsplash.com/random/1920x1080/?minecraft,dirt') center/cover;
             display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100;
         }
-        .menu-title { font-size: 36px; font-weight: bold; margin-bottom: 40px; text-shadow: 3px 3px #000; color: #ffaa00; }
-        .input-box { padding: 12px; width: 300px; font-size: 16px; background: #222; border: 2px solid #555; color: #fff; text-align: center; margin-bottom: 20px; outline: none; }
+        .menu-title { font-size: 36px; font-weight: bold; margin-bottom: 30px; text-shadow: 3px 3px #000; color: #ffaa00; }
+        
+        .input-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 15px; text-align: left; }
+        .input-group label { font-size: 12px; color: #aaa; text-shadow: 1px 1px #000; }
+        
+        .input-box { padding: 12px; width: 320px; font-size: 16px; background: #222; border: 2px solid #555; color: #fff; text-align: center; outline: none; }
         .input-box:focus { border-color: #ffaa00; }
-        .btn { padding: 12px 30px; font-size: 16px; background: #555; border: 2px solid #888; color: #fff; cursor: pointer; font-weight: bold; text-shadow: 1px 1px #000; box-shadow: inset -2px -2px #222, inset 2px 2px #fff; }
+        
+        .btn { padding: 12px 30px; font-size: 16px; background: #555; border: 2px solid #888; color: #fff; cursor: pointer; font-weight: bold; text-shadow: 1px 1px #000; box-shadow: inset -2px -2px #222, inset 2px 2px #fff; margin-top: 10px; }
         .btn:hover { background: #666; border-color: #ffaa00; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -28,9 +33,19 @@
 <body>
 
     <div id="login-screen">
-        <div class="menu-title">MINECRAFT WEB LOGIN</div>
-        <input type="text" id="username" class="input-box" placeholder="プレイヤー名を入力..." maxlength="16" value="Goku_Player">
-        <button class="btn" onclick="connectToGame()">マルチプレイに参加</button>
+        <div class="menu-title">マルチプレイサーバーに接続</div>
+        
+        <div class="input-group">
+            <label>118.104.167.114</label>
+            <input type="text" id="server-ip" class="input-box" placeholder="localhost" value="localhost">
+        </div>
+
+        <div class="input-group">
+            <label>プレイヤー名</label>
+            <input type="text" id="username" class="input-box" placeholder="名前を入力..." maxlength="16" value="Goku_Player">
+        </div>
+
+        <button class="btn" onclick="connectToGame()">サーバーに入って参加</button>
     </div>
 
     <canvas id="minecraft-canvas"></canvas>
@@ -38,6 +53,7 @@
     <div id="game-hud">
         <div id="f3-menu">
             Eaglercraft Engine v2<br>
+            Server: <span id="server-hud">None</span><br>
             Player: <span id="player-name-hud">None</span><br>
             XYZ: <span id="pos-x">0.0</span> / <span id="pos-y">0.0</span> / <span id="pos-z">0.0</span>
         </div>
@@ -45,15 +61,23 @@
     </div>
 
     <script>
-        const ws = new WebSocket('ws://localhost:8080');
+        let ws;
         const keys = { forward: false, back: false, left: false, right: false, jump: false };
 
         function connectToGame() {
+            const ip = document.getElementById('server-ip').value.trim();
             const user = document.getElementById('username').value.trim();
-            if(!user) return alert("名前を入力してください！");
 
-            // サーバーへ「この名前でログインして！」とリクエストを送る
-            if (ws.readyState === WebSocket.OPEN) {
+            if(!ip) return alert("サーバーIPアドレスを入力してください！");
+            if(!user) return alert("プレイヤー名を入力してください！");
+
+            // 入力されたIPアドレス（またはドメイン）を使ってWebSocketを確立
+            // ※「ws://IPアドレス:8080」の形に自動成形します
+            ws = new WebSocket(`ws://${ip}:8080`);
+
+            // 接続が成功したときの処理
+            ws.onopen = () => {
+                // サーバーへログイン要求を送信
                 ws.send(JSON.stringify({ type: 'login', username: user }));
                 
                 // 画面の切り替え
@@ -61,11 +85,15 @@
                 document.getElementById('minecraft-canvas').style.display = 'block';
                 document.getElementById('game-hud').style.display = 'block';
                 document.getElementById('player-name-hud').innerText = user;
+                document.getElementById('server-hud').innerText = ip;
                 
                 initEaglerEngine();
-            } else {
-                alert("自宅の中継サーバー(server.js)に接続できません。バッチファイルを確認してください。");
-            }
+            };
+
+            // 接続エラーが起きたとき
+            ws.onerror = () => {
+                alert(`サーバー (${ip}) に接続できませんでした。\n自宅のPCでバッチファイルが起動しているか、IPアドレスが正しいか確認してください。`);
+            };
         }
 
         function initEaglerEngine() {
@@ -78,13 +106,14 @@
             const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: false });
             renderer.setSize(window.innerWidth, window.innerHeight);
 
-            // ライトとテクスチャ設定
             const light = new THREE.DirectionalLight(0xffffff, 0.9);
             light.position.set(10, 20, 10).normalize();
             scene.add(light, new THREE.AmbientLight(0x666666));
 
+            // テクスチャ読み込みも、入力された自宅サーバーのIPから引っ張ってくるように自動連動！
+            const ip = document.getElementById('server-ip').value.trim();
             const textureLoader = new THREE.TextureLoader();
-            const blockTexture = textureLoader.load('http://localhost:8081/texture.png');
+            const blockTexture = textureLoader.load(`http://${ip}:8081/texture.png`);
             blockTexture.magFilter = THREE.NearestFilter;
             blockTexture.minFilter = THREE.NearestFilter;
 
@@ -116,7 +145,7 @@
             };
 
             // 操作送信
-            const sendMove = () => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'move', ...keys })); };
+            const sendMove = () => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'move', ...keys })); };
             window.addEventListener('keydown', (e) => {
                 const k = e.key.toLowerCase();
                 if (['w','a','s','d',' '].includes(k)) {
