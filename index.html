@@ -1,35 +1,27 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Goku Bot Dashboard</title>
-    <style>
-        body { background: #1a1a1a; color: #00ff00; font-family: monospace; padding: 20px; }
-        #log { border: 1px solid #444; padding: 10px; height: 200px; overflow-y: scroll; }
-    </style>
+    <title>Goku Bot - Real Minecraft View</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>body { margin: 0; background: #000; overflow: hidden; }</style>
 </head>
 <body>
-    <h1>🤖 Goku Bot リアルタイム通信</h1>
-    <div id="status">接続待機中...</div>
-    <div id="log"></div>
-
     <script>
-        // PCのIPアドレス（localhostで動いているならlocalhostでOK）
+        // 1. 3Dシーンの準備
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // 2. WebSocket接続
         const ws = new WebSocket('ws://' + window.location.hostname + ':8080');
-
-        ws.onopen = () => {
-            document.getElementById('status').innerText = "✅ サーバーに接続しました";
-        };
-
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            const log = document.getElementById('log');
-            log.innerHTML += `<p>座標更新: X=${data.x.toFixed(2)}, Y=${data.y.toFixed(2)}</p>`;
-            log.scrollTop = log.scrollHeight; // 自動スクロール
-        };
-
-        ws.onerror = (err) => {
-            document.getElementById('status').innerText = "❌ 接続失敗: サーバーが起動しているか確認してください";
+        
+        // 3. データを受け取って視点を動かす
+        ws.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            camera.position.set(data.x, data.y + 1.6, 0); // 高さ1.6mが目の高さ
+            renderer.render(scene, camera);
         };
     </script>
 </body>
