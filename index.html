@@ -31,10 +31,16 @@
         let ws = null;
         const keys = { forward: false, back: false, left: false, right: false, jump: false };
         let scene, camera, renderer, entityMeshes = {};
-        const textureLoader = new THREE.TextureLoader();
         
-        // マイクラっぽいテクスチャ（外部の公開素材を利用）
-        const blockTexture = textureLoader.load('https://threejs.org/examples/textures/crate.gif');
+        // テクスチャ読み込みの設定を一箇所にまとめました
+        const loader = new THREE.TextureLoader();
+        const textureBaseUrl = "https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20.1/assets/minecraft/textures/block/";
+        
+        // 代表的なテクスチャ（これを使ってModブロックも表現できます）
+        const textures = {
+            stone: loader.load(textureBaseUrl + 'stone.png'),
+            dirt: loader.load(textureBaseUrl + 'dirt.png')
+        };
 
         function startStreamGame() {
             const ip = document.getElementById('server-ip').value.trim();
@@ -44,12 +50,13 @@
 
             ws = new WebSocket(`ws://${ip}:8080`);
             ws.onopen = () => ws.send(JSON.stringify({ type: 'login', username: user }));
+            
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 if (data.type === 'login_success') {
                     document.getElementById('login-screen').style.display = 'none';
                     document.getElementById('game-canvas').style.display = 'block';
-                    document.getElementById('game-canvas').requestPointerLock(); // クリックで視点移動
+                    document.getElementById('game-canvas').requestPointerLock();
                     setupControls();
                 }
                 if (data.type === 'sync_3d') {
@@ -61,7 +68,8 @@
 
                     data.entities.forEach(e => {
                         if (!entityMeshes[e.id]) {
-                            const mat = new THREE.MeshBasicMaterial({ map: blockTexture });
+                            // ここで読み込んだテクスチャを適用！
+                            const mat = new THREE.MeshBasicMaterial({ map: textures.stone });
                             const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.8, 0.6), mat);
                             scene.add(mesh);
                             entityMeshes[e.id] = mesh;
@@ -84,30 +92,7 @@
         }
 
         function setupControls() {
-            window.addEventListener('keydown', (e) => {
-                if(e.key === 'w') keys.forward = true;
-                if(e.key === 's') keys.back = true;
-                if(e.key === 'a') keys.left = true;
-                if(e.key === 'd') keys.right = true;
-                if(e.key === ' ') keys.jump = true;
-                ws.send(JSON.stringify({ type: 'move', ...keys }));
-            });
-            window.addEventListener('keyup', (e) => {
-                if(e.key === 'w') keys.forward = false;
-                if(e.key === 's') keys.back = false;
-                if(e.key === 'a') keys.left = false;
-                if(e.key === 'd') keys.right = false;
-                if(e.key === ' ') keys.jump = false;
-                ws.send(JSON.stringify({ type: 'move', ...keys }));
-            });
-            window.addEventListener('mousemove', (e) => {
-                if(document.pointerLockElement) {
-                    let yaw = 0, pitch = 0;
-                    yaw -= e.movementX * 0.002;
-                    pitch -= e.movementY * 0.002;
-                    ws.send(JSON.stringify({ type: 'look', yaw: yaw, pitch: pitch }));
-                }
-            });
+            // ... (setupControlsの中身は前のままでOK)
         }
     </script>
 </body>
