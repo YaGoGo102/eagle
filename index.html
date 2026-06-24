@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>⚡ C++ マイクラBE Web-NPC コントローラー ⚡</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #1e1e24; color: #fff; text-align: center; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #2a2a35; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        input, button { padding: 10px; margin: 5px; border-radius: 6px; border: none; font-size: 16px; }
+        input { width: 60%; background: #3b3b4f; color: #fff; }
+        button { background: #4caf50; color: white; cursor: pointer; font-weight: bold; }
+        button:hover { background: #45a049; }
+        .btn-danger { background: #f44336; }
+        .btn-danger:hover { background: #da190b; }
+        .controls { display: grid; grid-template-columns: repeat(3, 1fr); width: 200px; margin: 20px auto; gap: 10px; }
+        .status { margin-top: 15px; font-weight: bold; color: #ffeb3b; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🎮 Web-NPC 操作パネル (GitHub Pages版)</h2>
+    
+    <div>
+        <input type="text" id="botName" value="Steve_Bot" placeholder="ボット名">
+        <button onclick="spawnBot()">ボットを召喚</button>
+        <button class="btn-danger" onclick="disconnectBot()">切断</button>
+    </div>
+
+    <div class="controls">
+        <td></td><button onclick="moveBot('forward')">▲ 前</button><td></td>
+        <button onclick="moveBot('left')">◀ 左</button><button onclick="moveBot('jump')">🚀 跳</button><button onclick="moveBot('right')">▶ 右</button>
+        <td></td><button onclick="moveBot('backward')">▼ 後</button><td></td>
+    </div>
+
+    <div style="margin-top: 20px;">
+        <input type="text" id="chatMsg" placeholder="チャットメッセージを入力...">
+        <button onclick="sendChat()" style="background: #2196f3;">送信</button>
+    </div>
+
+    <div class="status" id="wsStatus">自宅C++サーバーへ接続中...</div>
+</div>
+
+<script>
+    // ※ 自宅PCで動いているC++サーバーのIPを指定します。
+    // 同一PCでテストする場合は localhost、スマホ等から操作する場合は自宅PCのローカルIPを入力してください。
+    const socket = new WebSocket("ws://localhost:18080/ws");
+
+    socket.onopen = () => {
+        document.getElementById("wsStatus").innerText = "● 自宅C++サーバーと接続完了 (通信快適)";
+        document.getElementById("wsStatus").style.color = "#4caf50";
+    };
+
+    socket.onclose = () => {
+        document.getElementById("wsStatus").innerText = "❌ 自宅C++サーバーから切断されました";
+        document.getElementById("wsStatus").style.color = "#f44336";
+    };
+
+    function sendCommand(data) {
+        if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify(data));
+        }
+    }
+
+    function spawnBot() {
+        const name = document.getElementById("botName").value;
+        sendCommand({ action: "spawn", botName: name });
+    }
+
+    function disconnectBot() {
+        const name = document.getElementById("botName").value;
+        sendCommand({ action: "disconnect", botName: name });
+    }
+
+    function moveBot(dir) {
+        const name = document.getElementById("botName").value;
+        sendCommand({ action: "move", botName: name, direction: dir });
+    }
+
+    function sendChat() {
+        const name = document.getElementById("botName").value;
+        const msg = document.getElementById("chatMsg").value;
+        sendCommand({ action: "chat", botName: name, message: msg });
+        document.getElementById("chatMsg").value = "";
+    }
+</script>
+
+</body>
+</html>
