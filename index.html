@@ -1,15 +1,11 @@
 <!DOCTYPE html>
 <html>
+<head>
+    <meta charset="UTF-8">
+    <title>Goku Bot Control</title>
+</head>
 <body>
-    <h1>マイクラボット操作中...</h1>
-    <div id="status">HPデータ待機中</div>
-    <script>
-        // WebSocketでサーバーと通信
-        const ws = new WebSocket('ws://' + window.location.host);
-        ws.onmessage = (e) => {
-            const data = JSON.parse(e.data);
-            document.getElementById('status').innerText = "HP: " + data.health;
-        };
-    </script>
+    <h1>マイクラボット操作画面</h1>
+    <div id="status">接続を待機しています...</div>
 </body>
 </html>
