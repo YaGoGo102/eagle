@@ -2,121 +2,92 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>🎮 EaglerStyle 3D-NPC Web Controller 🎮</title>
+    <title>Goku_Bot 遠隔ラジコンパネル</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #14141f; color: #fff; margin: 0; padding: 20px; text-align: center; user-select: none; }
-        .wrapper { max-width: 900px; margin: 0 auto; background: #1e1e2d; padding: 20px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid #333; }
-        
-        /* マイクラ風ゲーム画面のコンテナ */
-        .game-viewport { width: 100%; height: 400px; background: #87CEEB; margin: 15px auto; border-radius: 8px; border: 4px solid #111; position: relative; overflow: hidden; }
-        .crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; font-size: 24px; font-weight: 300; pointer-events: none; }
-        
-        /* マイクラ風ホットバー（アイテム欄） */
-        .hotbar { display: flex; justify-content: center; background: rgba(0, 0, 0, 0.6); padding: 6px; border-radius: 4px; border: 3px solid #8f8f8f; width: 414px; margin: 20px auto; }
-        .slot { width: 40px; height: 40px; background: #8b8b8b; border: 3px solid #373737; border-top-color: #fff; border-left-color: #fff; margin: 0 2px; display: flex; align-items: center; justify-content: center; font-size: 12px; position: relative; }
-        .slot.selected { border: 4px solid #fffb00 !important; margin: -1px 1px; }
-        .item-count { position: absolute; bottom: 2px; right: 4px; font-size: 11px; color: #fff; font-weight: bold; text-shadow: 1px 1px 2px #000; }
-
-        input, button { padding: 10px; border-radius: 6px; border: none; font-size: 14px; }
-        input { background: #111; color: #fff; width: 40%; text-align: center; border: 1px solid #44   }
-        button { background: #00e676; color: #000; font-weight: bold; cursor: pointer; }
-        .status { color: #ffd700; font-size: 13px; margin-top: 10px; }
+        body { font-family: sans-serif; background: #222; color: #fff; text-align: center; }
+        #panel { margin: 20px auto; width: 400px; padding: 20px; background: #333; border-radius: 10px; }
+        .status { font-size: 18px; margin: 10px 0; color: #55ff55; }
+        .controls { font-weight: bold; color: #ffaa00; margin-top: 20px; }
+        #inventory { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-top: 10px; }
+        .item-slot { width: 60px; height: 60px; background: #444; border: 2px solid #555; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 10px; }
     </style>
 </head>
 <body>
+    <h1>🤖 Goku_Bot コントロールパネル (複数人対応)</h1>
+    <p>GitHub Pages からローカルのボットをみんなでWASDリアルタイム操作</p>
 
-<div class="wrapper">
-    <h2>🎮 EaglerStyle リアルタイム操作パネル</h2>
-    
-    <div>
-        <input type="text" id="botName" value="Goku_Bot">
-        <button onclick="spawnBot()">世界へログイン</button>
-    </div>
-
-    <div class="game-viewport">
-        <canvas id="gameCanvas" width="860" height="400" style="width:100%; height:100%;"></canvas>
-        <div class="crosshair">+</div>
-    </div>
-
-    <div class="hotbar" id="hotbar">
+    <div id="panel">
+        <div class="status">接続状態: <span id="ws-status" style="color:red;">切断</span></div>
+        <div class="status">座標: X:<span id="pos-x">0</span> Y:<span id="pos-y">0</span> Z:<span id="pos-z">0</span></div>
+        <div class="status">HP: ❤️<span id="bot-hp">20</span> | 🍖:<span id="bot-food">20</span></div>
+        
+        <div class="controls">
+            【操作方法】<br>
+            キーボードの <strong>W, A, S, D</strong> で移動<br>
+            <strong>Space</strong> でジャンプ
         </div>
 
-    <div>
-        <input type="text" id="chatMsg" placeholder="Tキーでチャットを開く..." style="width: 60px; width:70%;">
+        <h3>🎒 ボットのインベントリ</h3>
+        <div id="inventory"></div>
     </div>
-    <div class="status" id="wsStatus">C++サーバーに接続中...</div>
-</div>
 
-<script>
-    const socket = new WebSocket("ws://localhost:18080/ws");
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
+    <script>
+        const ws = new WebSocket('ws://localhost:8080');
+        const keys = { forward: false, back: false, left: false, right: false, jump: false };
 
-    // ホットバーの生成 (9スロット)
-    const hotbarEl = document.getElementById("hotbar");
-    for (let i = 0; i < 9; i++) {
-        let slot = document.createElement("div");
-        slot.className = `slot ${i === 0 ? 'selected' : ''}`;
-        slot.id = `slot-${i}`;
-        slot.innerHTML = `<span id="item-${i}">-</span><span class="item-count" id="count-${i}"></span>`;
-        hotbarEl.appendChild(slot);
-    }
+        ws.onopen = () => {
+            document.getElementById('ws-status').innerText = '接続中 (操作可能)';
+            document.getElementById('ws-status').style.color = '#55ff55';
+        };
 
-    // 簡易的な画面描画（マイクラの視点の代わりとして地面と空、ボット座標を描画）
-    let botX = 0, botZ = 0;
-    function drawView() {
-        ctx.fillStyle = "#87CEEB"; // 空の色
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#556B2F"; // 地面の緑
-        ctx.fillRect(0, 250, canvas.width, canvas.height - 250);
+        ws.onclose = () => {
+            document.getElementById('ws-status').innerText = '切断されました';
+            document.getElementById('ws-status').style.color = 'red';
+        };
 
-        // 座標インフォ
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "16px monospace";
-        ctx.fillText(`XYZ: ${botX.toFixed(1)} / 64.0 / ${botZ.toFixed(1)}`, 20, 30);
-        ctx.fillText(`Facing: North (固定)`, 20, 50);
-    }
-    drawView();
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'status') {
+                document.getElementById('pos-x').innerText = data.pos.x.toFixed(1);
+                document.getElementById('pos-y').innerText = data.pos.y.toFixed(1);
+                document.getElementById('pos-z').innerText = data.pos.z.toFixed(1);
+                document.getElementById('bot-hp').innerText = data.hp;
+                document.getElementById('bot-food').innerText = data.food;
 
-    socket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        
-        // C++側から送られてきた座標やアイテムデータを画面に反映
-        if (data.type === "update") {
-            botX = data.x;
-            botZ = data.z;
-            drawView();
-
-            // インベントリの同期
-            if (data.items) {
-                data.items.forEach((item, index) => {
-                    if (index < 9) {
-                        document.getElementById(`item-${index}`).innerText = item.name;
-                        document.getElementById(`count-${index}`).innerText = item.count > 1 ? item.count : "";
-                    }
+                const invDiv = document.getElementById('inventory');
+                invDiv.innerHTML = '';
+                data.inventory.forEach(item => {
+                    const slot = document.createElement('div');
+                    slot.className = 'item-slot';
+                    slot.innerHTML = `<div>${item.name}</div><div>x${item.count}</div>`;
+                    invDiv.appendChild(slot);
                 });
             }
-        }
-    };
+        };
 
-    socket.onopen = () => { document.getElementById("wsStatus").innerText = "● 接続成功！ WASDで操作可能"; };
+        const sendMove = () => {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'move', ...keys }));
+            }
+        };
 
-    function spawnBot() {
-        if (socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ action: "spawn", botName: document.getElementById("botName").value }));
-        }
-    }
+        window.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'w') keys.forward = true;
+            if (e.key.toLowerCase() === 's') keys.back = true;
+            if (e.key.toLowerCase() === 'a') keys.left = true;
+            if (e.key.toLowerCase() === 'd') keys.right = true;
+            if (e.key === ' ') keys.jump = true;
+            sendMove();
+        });
 
-    // キーボード操作の送信
-    window.addEventListener("keydown", (e) => {
-        if (document.activeElement === document.getElementById("chatMsg")) return;
-        const key = e.key.toLowerCase();
-        const botName = document.getElementById("botName").value;
-        if (["w", "a", "s", "d", " "].includes(key)) {
-            let dir = key === "w" ? "forward" : key === "s" ? "backward" : key === "a" ? "left" : key === "d" ? "right" : "jump";
-            socket.send(JSON.stringify({ action: "move", botName, direction: dir }));
-        }
-    });
-</script>
+        window.addEventListener('keyup', (e) => {
+            if (e.key.toLowerCase() === 'w') keys.forward = false;
+            if (e.key.toLowerCase() === 's') keys.back = false;
+            if (e.key.toLowerCase() === 'a') keys.left = false;
+            if (e.key.toLowerCase() === 'd') keys.right = false;
+            if (e.key === ' ') keys.jump = false;
+            sendMove();
+        });
+    </script>
 </body>
 </html>
