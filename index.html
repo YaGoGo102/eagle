@@ -2,20 +2,27 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>WebCraft HUD</title>
+    <title>WebCraft Complete</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         body, html { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
         #login-screen { position: absolute; top:0; left:0; width:100%; height:100%; background:#222; display:flex; justify-content:center; align-items:center; z-index:100; }
+        .box { background:#333; padding:30px; border-radius:10px; color:#fff; text-align:center; }
+        input { width:200px; padding:8px; margin:5px; }
         #game-canvas { width: 100%; height: 100%; display: none; cursor: crosshair; }
-        #hud { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; color: white; pointer-events: none; }
+        #hud { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); text-align:center; color: white; pointer-events: none; }
         #hotbar { display: flex; background: rgba(0,0,0,0.5); padding: 5px; border: 2px solid #555; }
-        .slot { width: 40px; height: 40px; border: 1px solid #777; margin: 2px; display:flex; align-items:center; justify-content:center; font-size: 10px; overflow:hidden; }
+        .slot { width: 40px; height: 40px; border: 1px solid #777; margin: 2px; font-size: 9px; overflow: hidden; display:flex; align-items:center; justify-content:center; }
     </style>
 </head>
 <body>
     <div id="login-screen">
-        <div class="box"><input id="ip" value="localhost"><button onclick="start()">接続</button></div>
+        <div class="box">
+            <h2>WebCraft 3D</h2>
+            <input id="ip" value="localhost"><br>
+            <input id="user" value="Goku_Bot"><br>
+            <button onclick="start()">ワールドへ参加</button>
+        </div>
     </div>
     <div id="game-canvas"></div>
     <div id="hud">
@@ -25,11 +32,14 @@
 
     <script>
         let ws, scene, camera, renderer;
+        const keys = { w:false, a:false, s:false, d:false, space:false };
+        const keyMap = {'w':'w', 'a':'a', 's':'s', 'd':'d', ' ':'space'};
         const raycaster = new THREE.Raycaster();
+
         function start() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-            renderer = new THREE.WebGLRenderer();
+            renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('game-canvas').appendChild(renderer.domElement);
             document.getElementById('game-canvas').style.display = 'block';
@@ -37,32 +47,32 @@
 
             ws = new WebSocket(`ws://${document.getElementById('ip').value}:8080`);
             ws.onmessage = (e) => {
-                const data = JSON.parse(e.data);
-                if(data.type === 'sync_3d') {
-                    camera.position.set(data.botPos.x, data.botPos.y + 1.6, data.botPos.z);
-                    camera.lookAt(camera.position.x - Math.sin(data.botYaw)*Math.cos(data.botPitch), camera.position.y + Math.sin(data.botPitch), camera.position.z - Math.cos(data.botYaw)*Math.cos(data.botPitch));
+                const d = JSON.parse(e.data);
+                if(d.type === 'sync_3d') {
+                    camera.position.set(d.botPos.x, d.botPos.y + 1.6, d.botPos.z);
+                    camera.lookAt(camera.position.x - Math.sin(d.botYaw)*Math.cos(d.botPitch), camera.position.y + Math.sin(d.botPitch), camera.position.z - Math.cos(d.botYaw)*Math.cos(d.botPitch));
                     renderer.render(scene, camera);
-                    // HUD更新
-                    document.getElementById('hp').innerText = Math.floor(data.health);
-                    document.getElementById('food').innerText = Math.floor(data.food);
+                    document.getElementById('hp').innerText = Math.floor(d.health);
+                    document.getElementById('food').innerText = Math.floor(d.food);
                     const hb = document.getElementById('hotbar'); hb.innerHTML = '';
-                    data.inventory.forEach(item => {
+                    d.inventory.forEach(i => {
                         const s = document.createElement('div'); s.className='slot';
-                        s.innerText = item ? item.name.split('_').pop() : '';
+                        s.innerText = i ? i.name.split('_').pop() : '';
                         hb.appendChild(s);
                     });
                 }
             };
-            // ... (その他のイベント処理は前述の通り)
+            window.onkeydown = (e) => { if(keyMap[e.key.toLowerCase()]) { keys[keyMap[e.key.toLowerCase()]] = true; ws.send(JSON.stringify({type:'move', ...keys})); }};
+            window.onkeyup = (e) => { if(keyMap[e.key.toLowerCase()]) { keys[keyMap[e.key.toLowerCase()]] = false; ws.send(JSON.stringify({type:'move', ...keys})); }};
             document.getElementById('game-canvas').onclick = () => document.getElementById('game-canvas').requestPointerLock();
-            document.addEventListener('mousedown', (e) => {
+            document.onmousedown = (e) => {
                 if(document.pointerLockElement) {
                     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-                    const intersects = raycaster.intersectObjects(scene.children);
-                    ws.send(JSON.stringify({type:'click', button:e.button, target: intersects[0]?.point || null}));
+                    const i = raycaster.intersectObjects(scene.children);
+                    ws.send(JSON.stringify({type:'click', button:e.button, target: i[0]?.point || null}));
                 }
-            });
-            window.addEventListener('mousemove', (e) => { if(document.pointerLockElement) ws.send(JSON.stringify({type:'look', dx:-e.movementX*0.002, dy:-e.movementY*0.002})); });
+            };
+            document.onmousemove = (e) => { if(document.pointerLockElement) ws.send(JSON.stringify({type:'look', dx:-e.movementX*0.002, dy:-e.movementY*0.002})); };
         }
     </script>
 </body>
