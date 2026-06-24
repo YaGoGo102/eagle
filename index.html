@@ -2,48 +2,83 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Goku_Bot 遠隔ラジコンパネル</title>
+    <title>Minecraft Realtime 3D Controller</title>
     <style>
-        body { font-family: sans-serif; background: #222; color: #fff; text-align: center; }
-        #panel { margin: 20px auto; width: 400px; padding: 20px; background: #333; border-radius: 10px; }
-        .status { font-size: 18px; margin: 10px 0; color: #55ff55; }
-        .controls { font-weight: bold; color: #ffaa00; margin-top: 20px; }
-        #inventory { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-top: 10px; }
-        .item-slot { width: 60px; height: 60px; background: #444; border: 2px solid #555; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 10px; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
+        
+        /* 本物の3Dゲーム画面（Prismarine-Viewer）を全画面表示 */
+        #game-viewer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            border: none;
+            z-index: 1;
+        }
+
+        /* ゲーム画面の上に重ねるマイクラUI層 */
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 2;
+            pointer-events: none; /* 下の3D画面の操作を邪魔しない */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+        }
+
+        #crosshair { font-size: 24px; color: rgba(255, 255, 255, 0.8); position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        #debug-info { position: absolute; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.5); padding: 10px; font-family: monospace; font-size: 13px; color: #fff; }
+        
+        #hud { position: absolute; bottom: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .bars { display: flex; justify-content: space-between; width: 364px; font-size: 16px; }
+        .hearts { color: #ff2222; } .food { color: #ffaa00; }
+
+        #hotbar { display: flex; background: rgba(0, 0, 0, 0.6); border: 4px solid #8f8f8f; border-top-color: #3f3f3f; border-left-color: #3f3f3f; }
+        .slot { width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; position: relative; font-size: 10px; font-family: monospace; text-shadow: 1px 1px #000; }
+        .item-count { position: absolute; bottom: 2px; right: 4px; font-size: 12px; color: #fff; }
+
+        #disconnect { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10; display: flex; justify-content: center; align-items: center; color: #ff5555; font-size: 24px; font-family: monospace; }
     </style>
 </head>
 <body>
-    <h1>🤖 Goku_Bot コントロールパネル (複数人対応)</h1>
-    <p>GitHub Pages からローカルのボットをみんなでWASDリアルタイム操作</p>
 
-    <div id="panel">
-        <div class="status">接続状態: <span id="ws-status" style="color:red;">切断</span></div>
-        <div class="status">座標: X:<span id="pos-x">0</span> Y:<span id="pos-y">0</span> Z:<span id="pos-z">0</span></div>
-        <div class="status">HP: ❤️<span id="bot-hp">20</span> | 🍖:<span id="bot-food">20</span></div>
-        
-        <div class="controls">
-            【操作方法】<br>
-            キーボードの <strong>W, A, S, D</strong> で移動<br>
-            <strong>Space</strong> でジャンプ
+    <iframe id="game-viewer" src="http://localhost:3000"></iframe>
+
+    <div id="ui-layer">
+        <div id="debug-info">
+            Minecraft 1.20.1 (Goku_Bot 3D Stream)<br>
+            XYZ: <span id="pos-x">0.0</span> / <span id="pos-y">0.0</span> / <span id="pos-z">0.0</span>
         </div>
-
-        <h3>🎒 ボットのインベントリ</h3>
-        <div id="inventory"></div>
+        <div id="crosshair">+</div>
+        <div id="hud">
+            <div class="bars">
+                <div class="hearts" id="hearts">❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️</div>
+                <div class="food" id="food">🍖🍖🍖🍖🍖🍖🍖🍖🍖🍖</div>
+            </div>
+            <div id="hotbar">
+                <div class="slot" id="s0"><span class="item-name"></span><span class="item-count"></span></div>
+                <div class="slot" id="s1"><span class="item-name"></span><span class="item-count"></span></div>
+                <div class="slot" id="s2"><span class="item-name"></span><span class="item-count"></span></div>
+                <div class="slot" id="s3"><span class="item-name"></span><span class="item-count"></span></div>
+                <div class="slot" id="s4"><span class="item-name"></span><span class="item-count"></span></div>
+                <div class="slot" id="s5"><span class="item-name"></span><span class="item-count"></span></div>
+                <div class="slot" id="s6"><span class="item-name"></span><span class="item-count"></span></div>
+                <div class="slot" id="s7"><span class="item-name"></span><span class="item-count"></span></div>
+                <div class="slot" id="s8"><span class="item-name"></span><span class="item-count"></span></div>
+            </div>
+        </div>
     </div>
+
+    <div id="disconnect">LOADING 3D MINECRAFT SCREEN...</div>
 
     <script>
         const ws = new WebSocket('ws://localhost:8080');
         const keys = { forward: false, back: false, left: false, right: false, jump: false };
 
-        ws.onopen = () => {
-            document.getElementById('ws-status').innerText = '接続中 (操作可能)';
-            document.getElementById('ws-status').style.color = '#55ff55';
-        };
-
-        ws.onclose = () => {
-            document.getElementById('ws-status').innerText = '切断されました';
-            document.getElementById('ws-status').style.color = 'red';
-        };
+        ws.onopen = () => { document.getElementById('disconnect').style.display = 'none'; };
+        ws.onclose = () => { document.getElementById('disconnect').style.display = 'flex'; document.getElementById('disconnect').innerText = 'SERVER DISCONNECTED'; };
 
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
@@ -51,42 +86,38 @@
                 document.getElementById('pos-x').innerText = data.pos.x.toFixed(1);
                 document.getElementById('pos-y').innerText = data.pos.y.toFixed(1);
                 document.getElementById('pos-z').innerText = data.pos.z.toFixed(1);
-                document.getElementById('bot-hp').innerText = data.hp;
-                document.getElementById('bot-food').innerText = data.food;
+                document.getElementById('hearts').innerText = '❤️'.repeat(Math.max(0, Math.ceil(data.hp / 2)));
+                document.getElementById('food').innerText = '🍖'.repeat(Math.max(0, Math.ceil(data.food / 2)));
 
-                const invDiv = document.getElementById('inventory');
-                invDiv.innerHTML = '';
-                data.inventory.forEach(item => {
-                    const slot = document.createElement('div');
-                    slot.className = 'item-slot';
-                    slot.innerHTML = `<div>${item.name}</div><div>x${item.count}</div>`;
-                    invDiv.appendChild(slot);
-                });
+                for (let i = 0; i < 9; i++) {
+                    const slot = document.getElementById(`s${i}`);
+                    if (data.inventory[i]) {
+                        slot.querySelector('.item-name').innerText = data.inventory[i].name.replace('minecraft:', '');
+                        slot.querySelector('.item-count').innerText = data.inventory[i].count > 1 ? data.inventory[i].count : '';
+                    } else {
+                        slot.querySelector('.item-name').innerText = '';
+                        slot.querySelector('.item-count').innerText = '';
+                    }
+                }
             }
         };
 
-        const sendMove = () => {
-            if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'move', ...keys }));
-            }
-        };
-
+        const sendMove = () => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'move', ...keys })); };
         window.addEventListener('keydown', (e) => {
-            if (e.key.toLowerCase() === 'w') keys.forward = true;
-            if (e.key.toLowerCase() === 's') keys.back = true;
-            if (e.key.toLowerCase() === 'a') keys.left = true;
-            if (e.key.toLowerCase() === 'd') keys.right = true;
-            if (e.key === ' ') keys.jump = true;
-            sendMove();
+            const k = e.key.toLowerCase();
+            if (['w','a','s','d',' '].includes(k)) {
+                if (k === 'w') keys.forward = true; if (k === 's') keys.back = true;
+                if (k === 'a') keys.left = true; if (k === 'd') keys.right = true;
+                if (k === ' ') keys.jump = true; sendMove();
+            }
         });
-
         window.addEventListener('keyup', (e) => {
-            if (e.key.toLowerCase() === 'w') keys.forward = false;
-            if (e.key.toLowerCase() === 's') keys.back = false;
-            if (e.key.toLowerCase() === 'a') keys.left = false;
-            if (e.key.toLowerCase() === 'd') keys.right = false;
-            if (e.key === ' ') keys.jump = false;
-            sendMove();
+            const k = e.key.toLowerCase();
+            if (['w','a','s','d',' '].includes(k)) {
+                if (k === 'w') keys.forward = false; if (k === 's') keys.back = false;
+                if (k === 'a') keys.left = false; if (k === 'd') keys.right = false;
+                if (k === ' ') keys.jump = false; sendMove();
+            }
         });
     </script>
 </body>
